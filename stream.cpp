@@ -70,12 +70,32 @@ void Stream::stateINIT(QXmlStreamReader::TokenType& token, QByteArray& name, boo
     }
 }
 
-void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, bool&){
+void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change){
     switch(token){
     case QXmlStreamReader::StartElement:
         switch(word2int(name)){
         case XMLWord::features:
             _readerState = ReaderState::FEATURES;
+            break;
+        case XMLWord::iq:
+        {
+            auto ft_bind = std::static_pointer_cast<FeatureBind>(_features.value(FeatureType::RESOURCEBIND));
+
+            InfoQuery iq = InfoQuery(_reader);
+            token = _reader.tokenType();
+            name = _reader.name().toUtf8();
+
+            QByteArray id = iq.getId();
+
+            switch(_iqWaiting.value(id)){
+            case IQPurpose::FEATURE:
+                ft_change = true;
+                _iqWaiting.erase(_iqWaiting.find(id));
+                break;
+            }
+
+            _iqResults.insert(std::move(id), std::move(iq));
+        }
             break;
         default:
             break;
@@ -226,15 +246,25 @@ void Stream::stateRESOURCEBIND(QXmlStreamReader::TokenType& token, QByteArray& n
         switch(word2int(name)){
         case XMLWord::required:
             _features.value(FeatureType::RESOURCEBIND)->required = true;
+            ft_change = true;
             break;
         default:
             break;
         }
         break;
+    case QXmlStreamReader::EndElement:
+        switch(word2int(name)){
+        case XMLWord::bind:
+            _readerState = ReaderState::STREAM;
+            break;
+        default:
+            break;
+        }
+
+        break;
     default:
         break;
     }
-
 }
 
 void Stream::readData(){
@@ -294,6 +324,7 @@ void Stream::processFeatures(){
                 _reader.clear();
                 _reader.setDevice(_socket);
                 reconnectSecure();
+                _featuresActive |= FeatureType::STARTTLS;
                 erase_feature  = true;
                 _readerState = ReaderState::INIT;
                 break;
@@ -301,7 +332,6 @@ void Stream::processFeatures(){
                 _socket->disconnectFromHost();
                 break;
             }
-
         }
             break;
         case FeatureType::SASL:
@@ -341,6 +371,7 @@ void Stream::processFeatures(){
                 _reader.clear();
                 _reader.setDevice(_socket);
                 _socket->write(getHeader() + "\r\n");
+                _featuresActive |= FeatureType::SASL;
                 erase_feature  = true;
                 _readerState = ReaderState::INIT;
             }
@@ -353,19 +384,43 @@ void Stream::processFeatures(){
         {
             qDebug() << "Feature RESOURCEBIND | Required: " << it.value()->required;
             auto ft_bind = std::static_pointer_cast<FeatureBind>(it.value());
-            switch(ft_bind->state){
-            case StateBind::GENERATE:
+            if(ft_bind->query_id.isEmpty()){
                 InfoQuery iq = InfoQuery();
                 iq.setId();
-                ft_bind->query_id = iq.getId();
-                QDomElement bind;
-                bind.setTagName("bind");
+                iq.setType("set");
+
+                QByteArray id = iq.getId();
+                ft_bind->query_id = id;
+                _iqWaiting.insert(id, IQPurpose::FEATURE);
+
+                QDomElement bind = iq.createElement("bind");
                 bind.setAttribute("xmlns", "urn:ietf:params:xml:ns:xmpp-bind");
-                iq.appendChild(bind);
-                QTextStream ts;
-                ts << iq.toText();
-                qDebug() << ts.readAll();
-                break;
+
+                iq.insertNode(bind);
+
+                _socket->write(iq.str() + "\r\n");
+            }else{
+                InfoQuery iq_result = _iqResults.value(ft_bind->query_id);
+                _iqResults.erase(_iqResults.find(ft_bind->query_id));
+
+                switch(word2int(iq_result.getType())){
+                case XMLWord::result:
+                {
+                    QDomNode bind_node = iq_result.firstChild();
+                    QDomElement jid_elem = bind_node.firstChildElement();
+
+                    QByteArray jid = jid_elem.text().toUtf8();
+                    _acc->setJid(jid);
+                    _featuresActive |= FeatureType::RESOURCEBIND;
+                    erase_feature = true;
+                }
+                    break;
+                case XMLWord::error:
+                    // TODO Handle bind errors
+                    break;
+                default:
+                    break;
+                }
             }
         }
             break;

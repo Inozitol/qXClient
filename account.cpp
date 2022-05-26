@@ -1,6 +1,6 @@
 #include "account.h"
 
-Account::Account(QString domain, Credentials cred, QString local, QString resource)
+Account::Account(QString domain, const Credentials& cred, QString local, QString resource)
     : Addressable(domain, local, resource),
       _cred(cred){}
 

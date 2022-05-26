@@ -9,7 +9,7 @@
 class Account : public Addressable
 {
 public:
-    Account(QString domain, Credentials cred, QString local="", QString resource="");
+    Account(QString domain, const Credentials& cred, QString local="", QString resource="");
     const Credentials &credentials() const;
 
 private:

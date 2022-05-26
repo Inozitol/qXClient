@@ -3,14 +3,20 @@
 
 #include <QSet>
 #include <QString>
-#include "saslmechanisms.h"
 
-enum class FeatureType{
+#include "saslmechanisms.h"
+#include "infoquery.h"
+
+enum class FeatureType : quint32{
     UNKNOWN,
-    STARTTLS,
-    SASL,
-    RESOURCEBIND
+    STARTTLS =      1 << 0,
+    SASL =          1 << 1,
+    RESOURCEBIND =  1 << 2
 };
+
+FeatureType operator|(FeatureType l, FeatureType r);
+FeatureType operator|=(FeatureType& l, FeatureType r);
+FeatureType operator&(FeatureType l, FeatureType r);
 
 struct Feature{
     Feature(FeatureType type_) : type(type_){}
@@ -44,14 +50,10 @@ struct FeatureSASL : Feature{
     QByteArray server_sig;
 };
 
-enum class StateBind{
-    GENERATE
-};
-
 struct FeatureBind : Feature{
     FeatureBind() : Feature(FeatureType::RESOURCEBIND){};
-    StateBind state = StateBind::GENERATE;
     QByteArray query_id;
+    InfoQuery result;
 };
 
 #endif // STREAMFEATURE_H

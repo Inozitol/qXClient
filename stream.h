@@ -43,15 +43,15 @@ private:
         NEGOTIATE
     };
 
-    inline QByteArray getHeader();
-    inline QByteArray getHeaderEnd();
-    inline QByteArray getSTARTTLS();
-    inline QByteArray getProceed();
-    inline QByteArray getAuth();
-    inline QByteArray getResponse();
+    enum class IQPurpose{
+        FEATURE
+    };
+
     void initSocket();
-    void processFeatures();
     void reconnectSecure();
+
+    void processFeatures();
+    void processInfoQuery();
 
     inline void stateINIT(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change);
     inline void stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change);
@@ -60,10 +60,18 @@ private:
     inline void stateSASL(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change);
     inline void stateRESOURCEBIND(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change);
 
+    inline QByteArray getHeader();
+    inline QByteArray getHeaderEnd();
+    inline QByteArray getSTARTTLS();
+    inline QByteArray getProceed();
+    inline QByteArray getAuth();
+    inline QByteArray getResponse();
+
     QSslSocket* _socket = nullptr;
     std::shared_ptr<Account> _acc;
     std::shared_ptr<Server> _srv;
 
+    FeatureType _featuresActive{};
     QXmlStreamReader _reader;
     ReaderState _readerState = ReaderState::INIT;
     QMap<FeatureType, std::shared_ptr<Feature>> _features;
@@ -73,7 +81,8 @@ private:
     };
     std::shared_ptr<SASL::SCRAMGenerator> _scramGenerator;
     QByteArray _srvStreamId;
-
+    QMap<QByteArray, IQPurpose> _iqWaiting;
+    QMap<QByteArray, InfoQuery> _iqResults;
 
 public slots:
     void connectInsecure();

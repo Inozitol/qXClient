@@ -19,7 +19,17 @@ QT_END_NAMESPACE
     WORD(proceed)       \
     WORD(challenge)     \
     WORD(success)       \
-    WORD(bind)
+    WORD(bind)          \
+    WORD(iq)            \
+    WORD(message)       \
+    WORD(presence)      \
+    WORD(to)            \
+    WORD(from)          \
+    WORD(id)            \
+    WORD(type)          \
+    WORD(lang)          \
+    WORD(result)        \
+    WORD(error)
 
 #define LAMBDA_ENUM(ENUM)       [](){ return XMLWord::ENUM; }
 

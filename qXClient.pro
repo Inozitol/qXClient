@@ -20,6 +20,7 @@ SOURCES += \
     server.cpp \
     stanza.cpp \
     stream.cpp \
+    streamfeature.cpp \
     strswitch.cpp \
     utils.cpp
 
