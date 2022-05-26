@@ -11,6 +11,7 @@ class Stanza : public QDomDocument
 {
 public:
     Stanza(const QByteArray& type);
+    Stanza(QByteArray&& type);
 
     void setTo(QByteArray data);
     void setFrom(QByteArray data);
@@ -25,6 +26,7 @@ public:
     QByteArray getLang();
 
     void insertNode(const QDomNode& node);
+    QDomNode root();
     QByteArray str();
 
     static const unsigned int ID_LEN = 5;

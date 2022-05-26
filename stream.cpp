@@ -2,13 +2,17 @@
 
 Stream::Stream(std::shared_ptr<Account> client, std::shared_ptr<Server> server)
     : _acc(client),
-      _srv(server)
+      _srv(server),
+      _contacts(_acc)
 {
     initSocket();
     _reader.setDevice(_socket);
     qDebug() << "Stream created"
              << "\nclient jid: " << _acc->jid()
              << "\nserver jid: " << _srv->jid();
+
+    connect(this, &Stream::coreEstablished, this, &Stream::queryRoster);
+    connect(this, &Stream::coreEstablished, this, [this](){ advertisePresence(true); });
 }
 
 Stream::~Stream(){
@@ -53,7 +57,7 @@ void Stream::sslSockStateChange(QAbstractSocket::SocketState state){
     qDebug() << "State change:" << state;
 }
 
-void Stream::stateINIT(QXmlStreamReader::TokenType& token, QByteArray& name, bool&){
+void Stream::stateINIT(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger&){
     switch(token){
     case QXmlStreamReader::StartElement:
         switch(word2int(name)){
@@ -70,7 +74,7 @@ void Stream::stateINIT(QXmlStreamReader::TokenType& token, QByteArray& name, boo
     }
 }
 
-void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change){
+void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger){
     switch(token){
     case QXmlStreamReader::StartElement:
         switch(word2int(name)){
@@ -84,17 +88,26 @@ void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, b
             InfoQuery iq = InfoQuery(_reader);
             token = _reader.tokenType();
             name = _reader.name().toUtf8();
+            qDebug() << "IQ:" << iq.str();
 
             QByteArray id = iq.getId();
 
             switch(_iqWaiting.value(id)){
             case IQPurpose::FEATURE:
-                ft_change = true;
-                _iqWaiting.erase(_iqWaiting.find(id));
+                trigger |= ReaderTrigger::FEATURE;
+                break;
+            case IQPurpose::ROSTER:
+                trigger |= ReaderTrigger::INFOQUERY;
                 break;
             }
-
             _iqResults.insert(std::move(id), std::move(iq));
+        }
+            break;
+        case XMLWord::presence:
+        {
+            presence_t presence(_reader);
+            jid_t jid = presence.from;
+            _contacts.setPresence(jid, presence);
         }
             break;
         default:
@@ -115,23 +128,23 @@ void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, b
     }
 }
 
-void Stream::stateFEATURES(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change){
+void Stream::stateFEATURES(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger){
     switch(token){
     case QXmlStreamReader::StartElement:
         switch(word2int(name)){
         case XMLWord::starttls:
             _features.insert(FeatureType::STARTTLS, std::make_shared<FeatureSTARTTLS>());
-            ft_change = true;
+            trigger |= ReaderTrigger::FEATURE;
             _readerState = ReaderState::STARTTLS;
             break;
         case XMLWord::mechanisms:
             _features.insert(FeatureType::SASL, std::make_shared<FeatureSASL>());
-            ft_change = true;
+            trigger |= ReaderTrigger::FEATURE;
             _readerState = ReaderState::SASL;
             break;
         case XMLWord::bind:
             _features.insert(FeatureType::RESOURCEBIND, std::make_shared<FeatureBind>());
-            ft_change = true;
+            trigger |= ReaderTrigger::FEATURE;
             _readerState = ReaderState::RESOURCEBIND;
             break;
         default:
@@ -151,10 +164,9 @@ void Stream::stateFEATURES(QXmlStreamReader::TokenType& token, QByteArray& name,
     default:
         break;
     }
-
 }
 
-void Stream::stateSTARTTLS(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change){
+void Stream::stateSTARTTLS(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger){
     switch(token){
     case QXmlStreamReader::StartElement:
         switch(word2int(name)){
@@ -163,7 +175,7 @@ void Stream::stateSTARTTLS(QXmlStreamReader::TokenType& token, QByteArray& name,
             break;
         case XMLWord::proceed:
             std::static_pointer_cast<FeatureSTARTTLS>(_features.value(FeatureType::STARTTLS))->state = StateSTARTTLS::PROCEED;
-            ft_change = true;
+            trigger |= ReaderTrigger::FEATURE;
             _readerState = ReaderState::STREAM;
             break;
         default:
@@ -186,7 +198,7 @@ void Stream::stateSTARTTLS(QXmlStreamReader::TokenType& token, QByteArray& name,
 
 }
 
-void Stream::stateSASL(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change){
+void Stream::stateSASL(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger){
     switch(token){
     case QXmlStreamReader::StartElement:
         switch(word2int(name)){
@@ -196,7 +208,7 @@ void Stream::stateSASL(QXmlStreamReader::TokenType& token, QByteArray& name, boo
             name = _reader.name().toUtf8();
             std::shared_ptr<FeatureSASL> feature_sasl = std::static_pointer_cast<FeatureSASL>(_features.value(FeatureType::SASL));
             feature_sasl->srv_mechanisms.insert(_reader.text().toString());
-            ft_change = true;
+            trigger |= ReaderTrigger::FEATURE;
         }
             break;
         case XMLWord::challenge:
@@ -206,7 +218,7 @@ void Stream::stateSASL(QXmlStreamReader::TokenType& token, QByteArray& name, boo
             std::shared_ptr<FeatureSASL> feature_sasl = std::static_pointer_cast<FeatureSASL>(_features.value(FeatureType::SASL));
             feature_sasl->challenge = QByteArray::fromBase64(_reader.text().toUtf8());
             feature_sasl->state = StateSASL::CHALLENGE;
-            ft_change = true;
+            trigger |= ReaderTrigger::FEATURE;
             _readerState = ReaderState::STREAM;
         }
             break;
@@ -217,7 +229,7 @@ void Stream::stateSASL(QXmlStreamReader::TokenType& token, QByteArray& name, boo
             std::shared_ptr<FeatureSASL> feature_sasl = std::static_pointer_cast<FeatureSASL>(_features.value(FeatureType::SASL));
             feature_sasl->server_sig = QByteArray::fromBase64(_reader.text().toUtf8());
             feature_sasl->state = StateSASL::SUCCESS;
-            ft_change = true;
+            trigger |= ReaderTrigger::FEATURE;
             _readerState = ReaderState::STREAM;
         }
             break;
@@ -233,20 +245,19 @@ void Stream::stateSASL(QXmlStreamReader::TokenType& token, QByteArray& name, boo
         default:
             break;
         }
-
         break;
     default:
         break;
     }
 }
 
-void Stream::stateRESOURCEBIND(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change){
+void Stream::stateRESOURCEBIND(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger){
     switch(token){
     case QXmlStreamReader::StartElement:
         switch(word2int(name)){
         case XMLWord::required:
             _features.value(FeatureType::RESOURCEBIND)->required = true;
-            ft_change = true;
+            trigger |= ReaderTrigger::FEATURE;
             break;
         default:
             break;
@@ -260,7 +271,6 @@ void Stream::stateRESOURCEBIND(QXmlStreamReader::TokenType& token, QByteArray& n
         default:
             break;
         }
-
         break;
     default:
         break;
@@ -268,7 +278,7 @@ void Stream::stateRESOURCEBIND(QXmlStreamReader::TokenType& token, QByteArray& n
 }
 
 void Stream::readData(){
-    bool ft_change = false;
+    ReaderTrigger trigg = {};
 
     while(!_reader.atEnd()){
         QXmlStreamReader::TokenType token = _reader.readNext();
@@ -281,33 +291,36 @@ void Stream::readData(){
         switch(_readerState){
 
         case ReaderState::INIT:
-            stateINIT(token,name,ft_change);
+            stateINIT(token,name,trigg);
             break;
         case ReaderState::STREAM:
-            stateSTREAM(token,name,ft_change);
+            stateSTREAM(token,name,trigg);
             break;
         case ReaderState::FEATURES:
-            stateFEATURES(token,name,ft_change);
+            stateFEATURES(token,name,trigg);
             break;
         case ReaderState::STARTTLS:
-            stateSTARTTLS(token,name,ft_change);
+            stateSTARTTLS(token,name,trigg);
             break;
         case ReaderState::SASL:
-            stateSASL(token,name,ft_change);
+            stateSASL(token,name,trigg);
             break;
         case ReaderState::RESOURCEBIND:
-            stateRESOURCEBIND(token,name,ft_change);
+            stateRESOURCEBIND(token,name,trigg);
             break;
         }
         qDebug() << "TOKEN: " << token << _reader.text() << name << _reader.namespaceUri();
     }
-    if(ft_change){
+    if(trigg & ReaderTrigger::FEATURE){
         processFeatures();
+    }
+    if(trigg & ReaderTrigger::INFOQUERY){
+        processInfoQuery();
     }
 }
 
 void Stream::processFeatures(){
-    bool erase_feature ;
+    bool erase_feature;
     for(auto it = _features.constBegin(); it != _features.constEnd();){
         erase_feature = false;
         switch(it.key()){
@@ -345,7 +358,7 @@ void Stream::processFeatures(){
                         ft_sasl->mechanism = sasl;
                         _scramGenerator = std::make_shared<SASL::SCRAMGenerator>(sasl, _acc->credentials());
                         _scramGenerator->setSCRAMFlag(SASL::SCRAMGenerator::CHANNEL_FLAG::N);
-                        _scramGenerator->writeAttribute(SASL::SCRAMGenerator::Attributes::NAME, _acc->jid().local.toUtf8());
+                        _scramGenerator->writeAttribute(SASL::SCRAMGenerator::Attributes::NAME, _acc->jid().local);
                         _scramGenerator->writeAttribute(SASL::SCRAMGenerator::Attributes::NONCE_CLIENT, Utils::getRandomString(NONCE_INIT_LEN));
                         _socket->write(getAuth() + "\r\n");
                         _readerState = ReaderState::SASL;
@@ -401,18 +414,20 @@ void Stream::processFeatures(){
                 _socket->write(iq.str() + "\r\n");
             }else{
                 InfoQuery iq_result = _iqResults.value(ft_bind->query_id);
-                _iqResults.erase(_iqResults.find(ft_bind->query_id));
+                _iqWaiting.erase(_iqWaiting.constFind(ft_bind->query_id));
+                _iqResults.erase(_iqResults.constFind(ft_bind->query_id));
 
                 switch(word2int(iq_result.getType())){
                 case XMLWord::result:
                 {
-                    QDomNode bind_node = iq_result.firstChild();
+                    QDomNode bind_node = iq_result.root().firstChild();
                     QDomElement jid_elem = bind_node.firstChildElement();
 
                     QByteArray jid = jid_elem.text().toUtf8();
                     _acc->setJid(jid);
                     _featuresActive |= FeatureType::RESOURCEBIND;
                     erase_feature = true;
+                    emit coreEstablished();
                 }
                     break;
                 case XMLWord::error:
@@ -435,6 +450,56 @@ void Stream::processFeatures(){
             ++it;
         }
     }
+}
+
+void Stream::processInfoQuery(){
+    auto it = _iqResults.constBegin();
+    while(it != _iqResults.constEnd()){
+        QByteArray id = it.key();
+        InfoQuery iq = it.value();
+        IQPurpose purpose = _iqWaiting.value(id);
+
+        switch(purpose){
+        case IQPurpose::ROSTER:
+        {
+            QDomNode query_node = iq.root().firstChild();
+            QDomNodeList item_list = query_node.childNodes();
+            for(int i=0; i<item_list.length(); i++){
+                QDomElement currItem = item_list.at(i).toElement();
+                rosteritem_t roster(currItem);
+                jid_t jid(roster.jid);
+                _contacts.setContact(jid.bare(), roster);
+            }
+        }
+            break;
+        default:
+            break;
+        }
+
+        _iqWaiting.erase(_iqWaiting.constFind(id));
+        it = _iqResults.erase(it);
+    }
+}
+
+void Stream::queryRoster(){
+    InfoQuery iq;
+    iq.setFrom(_acc->jid().str());
+    iq.setId();
+    iq.setType("get");
+
+    _iqWaiting.insert(iq.getId(), IQPurpose::ROSTER);
+
+    QDomElement query = iq.createElement("query");
+    query.setAttribute("xmlns", "jabber:iq:roster");
+
+    iq.insertNode(query);
+
+    _socket->write(iq.str() + "\r\n");
+}
+
+void Stream::advertisePresence(bool status){
+    QByteArray presence_tag = getPresence(status);
+    _socket->write(presence_tag + "\r\n");
 }
 
 void Stream::disconnectHandle(){
@@ -508,4 +573,34 @@ QByteArray Stream::getResponse(){
     writer.writeCharacters(_scramGenerator->getChallengeResponse().toBase64());
     writer.writeEndElement();
     return arr;
+}
+QByteArray Stream::getPresence(bool status){
+    QByteArray arr;
+    QXmlStreamWriter writer(&arr);
+    writer.writeStartElement("presence");
+    if(!status){
+        writer.writeAttribute("type","unavailable");
+    }
+    writer.writeEndElement();
+    return arr;
+}
+
+Stream::ReaderTrigger operator|(Stream::ReaderTrigger l, Stream::ReaderTrigger r){
+    return static_cast<Stream::ReaderTrigger>(
+                static_cast<std::underlying_type_t<Stream::ReaderTrigger>>(l) |
+                static_cast<std::underlying_type_t<Stream::ReaderTrigger>>(r)
+                );
+}
+
+Stream::ReaderTrigger operator|=(Stream::ReaderTrigger& l, Stream::ReaderTrigger r){
+    l = l | r;
+    return l;
+}
+
+
+bool operator&(Stream::ReaderTrigger l, Stream::ReaderTrigger r){
+    return static_cast<Stream::ReaderTrigger>(
+                static_cast<std::underlying_type_t<Stream::ReaderTrigger>>(l) &
+                static_cast<std::underlying_type_t<Stream::ReaderTrigger>>(r)
+                ) == r;
 }

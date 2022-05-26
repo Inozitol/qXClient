@@ -6,19 +6,18 @@
 #include <QDebug>
 
 struct jid_t{
-    QString domain;
-    QString local;
-    QString resource;
+    QByteArray domain;
+    QByteArray local;
+    QByteArray resource;
 
     friend QDataStream& operator<<(QDataStream& os, const jid_t& jid){
-        QString str;
-        str << jid;
-        os << str;
+        QByteArray arr;
+        arr << jid;
+        os << arr;
         return os;
     }
 
-
-    friend QString& operator<<(QString& ostr, const jid_t& jid){
+    friend QByteArray& operator<<(QByteArray& ostr, const jid_t& jid){
         if(!jid.local.isEmpty()){
             ostr.append(jid.local + '@');
         }
@@ -31,10 +30,23 @@ struct jid_t{
 
     friend QDebug& operator<<(QDebug& debug, const jid_t& jid){
         QDebugStateSaver saver(debug);
-        QString str;
-        str << jid;
-        debug.nospace() << str;
+        QByteArray arr;
+        arr << jid;
+        debug.nospace() << arr;
         return debug;
+    }
+
+    friend bool operator==(const jid_t& l, const jid_t& r){
+        if(l.domain != r.domain)        return false;
+        if(l.local != r.local)          return false;
+        if(l.resource != r.resource)    return false;
+        return true;
+    }
+
+    friend bool operator<(const jid_t& l, const jid_t& r){
+        QByteArray l_str = l.domain+l.local+l.resource;
+        QByteArray r_str = r.domain+r.local+r.resource;
+        return l_str < r_str;
     }
 
     jid_t(const QByteArray& in){
@@ -73,23 +85,34 @@ struct jid_t{
         }
     }
 
-    jid_t(QString domain_, QString local_, QString resource_){
+    jid_t(const QByteArray& domain_, const QByteArray& local_, const QByteArray& resource_){
         domain = domain_;
         local = local_;
         resource = resource_;
     }
 
-    QString str(){
-        QString str;
-        str << *this;
-        return str;
+    jid_t()=default;
+
+    QByteArray str(){
+        QByteArray arr;
+        arr << *this;
+        return arr;
+    }
+
+    jid_t bare() const{
+        jid_t bareJid;
+        bareJid.domain = domain;
+        bareJid.local = local;
+        return bareJid;
     }
 };
 
 class Addressable
 {
 public:
-    Addressable(QString domain, QString local="", QString resource="");
+    Addressable(const QByteArray& domain,
+                const QByteArray& local="",
+                const QByteArray& resource="");
     void setJid(const jid_t& jid);
     jid_t jid();
 

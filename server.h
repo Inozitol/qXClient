@@ -9,7 +9,9 @@
 class Server : public Addressable
 {
 public:
-  Server(QString domain, QString local="",  QString resource="");
+  Server(const QByteArray& domain,
+         const QByteArray& local="",
+         const QByteArray& resource="");
 };
 
 #endif // SERVER_H

@@ -20,6 +20,8 @@
 #include "scramgenerator.h"
 #include "strswitch.h"
 #include "infoquery.h"
+#include "presence.h"
+#include "contacts.h"
 
 class Stream : public QObject{
     Q_OBJECT
@@ -38,13 +40,25 @@ private:
         RESOURCEBIND
     };
 
+    enum class ReaderTrigger : quint32{
+        FEATURE =   1 << 0,
+        MESSAGE =   1 << 1,
+        PRESENCE =  1 << 2,
+        INFOQUERY = 1 << 3,
+    };
+
+    friend ReaderTrigger operator|(ReaderTrigger l, ReaderTrigger r);
+    friend ReaderTrigger operator|=(ReaderTrigger& l, ReaderTrigger r);
+    friend bool operator&(ReaderTrigger l, ReaderTrigger r);
+
     enum class StreamState{
         INIT,
         NEGOTIATE
     };
 
     enum class IQPurpose{
-        FEATURE
+        FEATURE,
+        ROSTER
     };
 
     void initSocket();
@@ -53,12 +67,12 @@ private:
     void processFeatures();
     void processInfoQuery();
 
-    inline void stateINIT(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change);
-    inline void stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change);
-    inline void stateFEATURES(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change);
-    inline void stateSTARTTLS(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change);
-    inline void stateSASL(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change);
-    inline void stateRESOURCEBIND(QXmlStreamReader::TokenType& token, QByteArray& name, bool& ft_change);
+    inline void stateINIT(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger);
+    inline void stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger);
+    inline void stateFEATURES(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger);
+    inline void stateSTARTTLS(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger);
+    inline void stateSASL(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger);
+    inline void stateRESOURCEBIND(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger);
 
     inline QByteArray getHeader();
     inline QByteArray getHeaderEnd();
@@ -66,6 +80,7 @@ private:
     inline QByteArray getProceed();
     inline QByteArray getAuth();
     inline QByteArray getResponse();
+    inline QByteArray getPresence(bool status);
 
     QSslSocket* _socket = nullptr;
     std::shared_ptr<Account> _acc;
@@ -83,9 +98,12 @@ private:
     QByteArray _srvStreamId;
     QMap<QByteArray, IQPurpose> _iqWaiting;
     QMap<QByteArray, InfoQuery> _iqResults;
+    Contacts _contacts;
 
 public slots:
     void connectInsecure();
+    void queryRoster();
+    void advertisePresence(bool status);
 
 private slots:
     void sslSockStateChange(QAbstractSocket::SocketState sockState);
@@ -96,6 +114,7 @@ private slots:
 
 signals:
     void finished();
+    void coreEstablished();
 };
 
 #endif // STREAM_H

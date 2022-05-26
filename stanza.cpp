@@ -5,6 +5,11 @@ Stanza::Stanza(const QByteArray& type){
     appendChild(_stanza);
 }
 
+Stanza::Stanza(QByteArray&& type){
+    _stanza = createElement(type);
+    appendChild(_stanza);
+}
+
 void Stanza::setTo(QByteArray data){
     _stanza.toElement().setAttribute("to", data);
 }
@@ -56,4 +61,8 @@ void Stanza::insertNode(const QDomNode& node){
 
 QByteArray Stanza::str(){
     return toByteArray(0).replace('\n', "");
+}
+
+QDomNode Stanza::root(){
+    return _stanza;
 }

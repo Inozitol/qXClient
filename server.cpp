@@ -1,6 +1,6 @@
 #include "server.h"
 
-Server::Server(QString domain, QString local, QString resource)
+Server::Server(const QByteArray& domain, const QByteArray& local, const QByteArray& resource)
   : Addressable(domain, local, resource)
 {
 

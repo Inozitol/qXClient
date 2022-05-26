@@ -11,10 +11,12 @@ CONFIG += c++17
 SOURCES += \
     account.cpp \
     addressable.cpp \
+    contacts.cpp \
     creds.cpp \
     infoquery.cpp \
     main.cpp \
     mainwindow.cpp \
+    message.cpp \
     saslgenerator.cpp \
     scramgenerator.cpp \
     server.cpp \
@@ -27,9 +29,13 @@ SOURCES += \
 HEADERS += \
     account.h \
     addressable.h \
+    contacts.h \
     creds.h \
     infoquery.h \
     mainwindow.h \
+    message.h \
+    presence.h \
+    roster.h \
     saslgenerator.h \
     saslmechanisms.h \
     scramgenerator.h \

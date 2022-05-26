@@ -1,6 +1,6 @@
 #include "addressable.h"
 
-Addressable::Addressable(QString domain, QString local, QString resource)
+Addressable::Addressable(const QByteArray& domain, const QByteArray& local, const QByteArray& resource)
   : _jid({domain, local, resource}){}
 
 jid_t Addressable::jid(){
