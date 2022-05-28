@@ -11,6 +11,7 @@ Stream::Stream(std::shared_ptr<Account> client, std::shared_ptr<Server> server)
              << "\nclient jid: " << _acc->jid()
              << "\nserver jid: " << _srv->jid();
 
+    chatModel = new ChatChainModel();
     connect(this, &Stream::coreEstablished, this, &Stream::queryRoster);
     connect(this, &Stream::coreEstablished, this, [this](){ advertisePresence(true); });
 }
@@ -108,6 +109,13 @@ void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, R
             presence_t presence(_reader);
             jid_t jid = presence.from;
             _contacts.setPresence(jid, presence);
+        }
+            break;
+        case XMLWord::message:
+        {
+            Message message(_reader);
+            chatModel->addMessage(message);
+            qDebug() << "Message from:" << message.getFrom() << "reads" << message.getBody();
         }
             break;
         default:
@@ -465,8 +473,8 @@ void Stream::processInfoQuery(){
             QDomNode query_node = iq.root().firstChild();
             QDomNodeList item_list = query_node.childNodes();
             for(int i=0; i<item_list.length(); i++){
-                QDomElement currItem = item_list.at(i).toElement();
-                rosteritem_t roster(currItem);
+                QDomElement curr_item = item_list.at(i).toElement();
+                rosteritem_t roster(curr_item);
                 jid_t jid(roster.jid);
                 _contacts.setContact(jid.bare(), roster);
             }

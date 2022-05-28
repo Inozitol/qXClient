@@ -14,6 +14,7 @@ struct presence_t{
     QByteArray type;
     QByteArray show;
     QMap<QByteArray, QByteArray> status_map;
+    signed char priority = 0;
 
     presence_t(QXmlStreamReader& reader){
         if(reader.tokenType() != QXmlStreamReader::StartElement){
@@ -67,6 +68,18 @@ struct presence_t{
                     lang = (lang.isEmpty()) ? def_lang : lang;
                     reader.readNext();
                     status_map[lang] = reader.text().toUtf8();
+                }
+                    break;
+                case XMLWord::priority:
+                {
+                    reader.readNext();
+                    QByteArray prio_str = reader.text().toUtf8();
+                    bool check;
+                    int prio_int = prio_str.toInt(&check);
+                    if(!check){
+                        // TODO wrong priority
+                    }
+                    priority = static_cast<signed char>(prio_int);
                 }
                     break;
                 default:

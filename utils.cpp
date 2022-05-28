@@ -1,28 +1,65 @@
 #include "utils.h"
 
 namespace Utils{
-    QByteArray getRandomString(int len){
-        QByteArray result;
-        for(; len>0; --len){
-            char rando_char;
-            do{
-                rando_char = QRandomGenerator64::global()->bounded(33,126);
-            }while(rando_char == ',');
-            result.append(rando_char);
-        }
-        return result;
+QByteArray getRandomString(int len){
+    QByteArray result;
+    for(; len>0; --len){
+        char rando_char;
+        do{
+            rando_char = QRandomGenerator64::global()->bounded(33,126);
+        }while(rando_char == ',');
+        result.append(rando_char);
+    }
+    return result;
+}
+
+QByteArray getXOR(const QByteArray& arr1, const QByteArray& arr2){
+    qsizetype len1 = arr1.length();
+    qsizetype len2 = arr2.length();
+    qsizetype iter = std::max({len1, len2});
+    QByteArray result;
+    for(int i = 0; i < iter; i++){
+        char val = arr1.at(i%len1) ^ arr2.at(i%len2);
+        result.append(val);
+    }
+    return result;
+}
+
+void reader2node(QDomDocument& doc, QDomNode& node, QXmlStreamReader& reader){
+    if(reader.tokenType() != QXmlStreamReader::StartElement){
+        throw std::invalid_argument("reader2node expects reader on element start");
     }
 
-    QByteArray getXOR(const QByteArray& arr1, const QByteArray& arr2){
-        qsizetype len1 = arr1.length();
-        qsizetype len2 = arr2.length();
-        qsizetype iter = std::max({len1, len2});
-        QByteArray result;
-        for(int i = 0; i < iter; i++){
-            char val = arr1.at(i%len1) ^ arr2.at(i%len2);
-            result.append(val);
-        }
-        return result;
-    }
+    QXmlStreamReader::TokenType token = reader.readNext();
+    QString name = reader.name().toString();
+    QString ending_str = node.nodeName();
+    QDomElement currNode = node.toElement();
 
+    while(name != ending_str){
+        switch(token){
+        case QXmlStreamReader::StartElement:
+        {
+            QDomElement newNode = doc.createElement(name);
+            for(const auto& attr : reader.attributes()){
+                newNode.setAttribute(attr.name().toString(), attr.value().toString());
+            }
+            currNode = currNode.appendChild(newNode).toElement();
+        }
+            break;
+        case QXmlStreamReader::EndElement:
+            currNode = currNode.parentNode().toElement();
+            break;
+        case QXmlStreamReader::Characters:
+        {
+            QDomText textNode = doc.createTextNode(reader.text().toString());
+            currNode.appendChild(textNode).toElement();
+        }
+            break;
+        default:
+            break;
+        }
+        token = reader.readNext();
+        name = reader.name().toUtf8();
+    }
+}
 }

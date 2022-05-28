@@ -6,6 +6,7 @@
 #include "account.h"
 #include "server.h"
 #include "stream.h"
+#include "chatwindow.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }

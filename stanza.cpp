@@ -33,6 +33,7 @@ void Stanza::setType(QByteArray data){
 
 void Stanza::setLang(QByteArray data){
     _stanza.toElement().setAttribute("lang", data);
+    _def_locale = QLocale(data);
 }
 
 QByteArray Stanza::getTo(){

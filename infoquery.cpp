@@ -36,31 +36,7 @@ InfoQuery::InfoQuery(QXmlStreamReader& reader)
         }
     }
 
-    QXmlStreamReader::TokenType token = reader.readNext();
-    QByteArray name = reader.name().toUtf8();
-    QDomElement currNode = _stanza.toElement();
-    while(name != "iq"){
-        switch(token){
-        case QXmlStreamReader::StartElement:
-        {
-            QDomElement newNode = createElement(name);
-            for(const auto& attr : reader.attributes()){
-                newNode.setAttribute(attr.name().toString(), attr.value().toString());
-            }
-            currNode = currNode.appendChild(newNode).toElement();
-        }
-            break;
-        case QXmlStreamReader::Characters:
-        {
-            QDomText textNode = createTextNode(reader.text().toString());
-            currNode = currNode.appendChild(textNode).toElement();
-        }
-            break;
-        default:
-            break;
-        }
-        token = reader.readNext();
-        name = reader.name().toUtf8();
-    }
+    Utils::reader2node(*this, _stanza, reader);
+
 
 }

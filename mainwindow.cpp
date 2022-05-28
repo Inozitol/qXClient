@@ -22,6 +22,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(thread, &QThread::finished,
             thread, &QThread::deleteLater);
     thread->start();
+
+    ChatWindow* chatW = new ChatWindow(stream->chatModel);
+    chatW->show();
 }
 
 MainWindow::~MainWindow()

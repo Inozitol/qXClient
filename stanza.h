@@ -32,6 +32,7 @@ public:
     static const unsigned int ID_LEN = 5;
 protected:
     QDomNode _stanza;
+    QLocale _def_locale;
 };
 
 #endif // STANZA_H

@@ -11,6 +11,8 @@ CONFIG += c++17
 SOURCES += \
     account.cpp \
     addressable.cpp \
+    chatchainmodel.cpp \
+    chatwindow.cpp \
     contacts.cpp \
     creds.cpp \
     infoquery.cpp \
@@ -29,6 +31,8 @@ SOURCES += \
 HEADERS += \
     account.h \
     addressable.h \
+    chatchainmodel.h \
+    chatwindow.h \
     contacts.h \
     creds.h \
     infoquery.h \
@@ -47,6 +51,7 @@ HEADERS += \
     utils.h
 
 FORMS += \
+    chatwindow.ui \
     mainwindow.ui
 
 TRANSLATIONS += \

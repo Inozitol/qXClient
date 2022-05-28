@@ -22,6 +22,8 @@
 #include "infoquery.h"
 #include "presence.h"
 #include "contacts.h"
+#include "message.h"
+#include "chatchainmodel.h"
 
 class Stream : public QObject{
     Q_OBJECT
@@ -30,6 +32,7 @@ public:
     ~Stream();
 
     static const unsigned int NONCE_INIT_LEN = 24;
+    ChatChainModel* chatModel;
 private:
     enum class ReaderState{
         INIT,
@@ -51,11 +54,6 @@ private:
     friend ReaderTrigger operator|=(ReaderTrigger& l, ReaderTrigger r);
     friend bool operator&(ReaderTrigger l, ReaderTrigger r);
 
-    enum class StreamState{
-        INIT,
-        NEGOTIATE
-    };
-
     enum class IQPurpose{
         FEATURE,
         ROSTER
@@ -66,6 +64,7 @@ private:
 
     void processFeatures();
     void processInfoQuery();
+    void processMessage();
 
     inline void stateINIT(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger);
     inline void stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, ReaderTrigger& trigger);

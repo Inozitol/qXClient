@@ -8,10 +8,10 @@ Message::Message(QXmlStreamReader& reader)
     : Stanza("message")
 {
     if(reader.tokenType() != QXmlStreamReader::StartElement){
-        throw std::invalid_argument("InfoQuery expects reader on element start");
+        throw std::invalid_argument("Message expects reader on element start");
     }
     if(reader.name().toUtf8() != "message"){
-        throw std::invalid_argument("InfoQuery expects reader on InfoQuery stanza");
+        throw std::invalid_argument("Message expects reader on message stanza");
     }
 
     for(const auto& attr : reader.attributes()){
@@ -36,30 +36,53 @@ Message::Message(QXmlStreamReader& reader)
         }
     }
 
-    QXmlStreamReader::TokenType token = reader.readNext();
-    QByteArray name = reader.name().toUtf8();
-    QDomElement currNode = _stanza.toElement();
-    while(name != "message"){
-        switch(token){
-        case QXmlStreamReader::StartElement:
+    Utils::reader2node(*this, _stanza, reader);
+
+    QDomNodeList msg_child_list = root().childNodes();
+    for(int i=0; i<msg_child_list.length(); i++){
+        QDomElement curr_item = msg_child_list.at(i).toElement();
+        switch(word2int(curr_item.tagName().toUtf8())){
+        case XMLWord::body:
         {
-            QDomElement newNode = createElement(name);
-            for(const auto& attr : reader.attributes()){
-                newNode.setAttribute(attr.name().toString(), attr.value().toString());
+            QString text = curr_item.text().toUtf8();
+            QByteArray lang = curr_item.attribute("lang").toUtf8();
+            if(!lang.isEmpty()){
+                _body_map.insert(QLocale(lang), text);
+            }else{
+                _body_map.insert(_def_locale, text);
             }
-            currNode = currNode.appendChild(newNode).toElement();
         }
             break;
-        case QXmlStreamReader::Characters:
+        case XMLWord::subject:
         {
-            QDomText textNode = createTextNode(reader.text().toString());
-            currNode = currNode.appendChild(textNode).toElement();
+            QString text = curr_item.text();
+            QByteArray lang = curr_item.attribute("lang").toUtf8();
+            if(!lang.isEmpty()){
+                _subj_map.insert(QLocale(lang), text);
+            }else{
+                _subj_map.insert(_def_locale, text);
+            }
+
         }
             break;
         default:
             break;
         }
-        token = reader.readNext();
-        name = reader.name().toUtf8();
     }
+}
+
+QString Message::getBody(const QLocale& locale){
+    return _body_map.value(locale);
+}
+
+QString Message::getBody(){
+    return _body_map.value(_def_locale);
+}
+
+QString Message::getSubject(const QLocale& locale){
+    return _subj_map.value(locale);
+}
+
+QString Message::getSubject(){
+    return _subj_map.value(_def_locale);
 }
