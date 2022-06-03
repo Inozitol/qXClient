@@ -6,29 +6,37 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    showMaximized();
 
-    std::shared_ptr<Account> cle = std::make_shared<Account>("xmpp.chochrun.eu", Credentials("xmpppass"), "tester");
-    std::shared_ptr<Server> srv = std::make_shared<Server>("xmpp.chochrun.eu");
-
-    QThread* thread = new QThread();
-    Stream* stream = new Stream(cle, srv);
-    stream->moveToThread(thread);
-    connect(thread, &QThread::started,
-            stream, &Stream::connectInsecure);
-    connect(stream, &Stream::finished,
-            thread, &QThread::quit);
-    connect(stream, &Stream::finished,
-            stream, &Stream::deleteLater);
-    connect(thread, &QThread::finished,
-            thread, &QThread::deleteLater);
-    thread->start();
-
-    ChatWindow* chatW = new ChatWindow(stream->chatModel);
-    chatW->show();
+    initMenuBar();
+    ui->tabWidget->clear();
 }
 
 MainWindow::~MainWindow()
 {
-    delete ui;
+    delete(ui);
 }
 
+void MainWindow::initMenuBar(){
+    connect(ui->actionConnect, &QAction::triggered,
+            this, &MainWindow::connectAccount);
+}
+
+void MainWindow::initMetaTypes(){
+    qRegisterMetaType<Message>();
+}
+
+void MainWindow::connectAccount(){
+    AccountDialog* diag = new AccountDialog(AccountDialog::Purpose::LOGIN, this);
+    if(diag->exec()){
+        Stream* stream = StreamPool::instance().getLast();
+
+        jidbare_t jid = stream->accountJid();
+        ContactTreeModel* model = stream->getContactsModel();
+        TabHolder* widget = new TabHolder(jid,model,this);
+        ui->tabWidget->addTab(widget, stream->accountJid().str());
+        if(!ui->tabWidget->isEnabled()){
+            ui->tabWidget->setEnabled(true);
+        }
+    }
+}

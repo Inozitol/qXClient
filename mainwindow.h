@@ -3,10 +3,13 @@
 
 #include <QMainWindow>
 
-#include "account.h"
-#include "server.h"
-#include "stream.h"
-#include "chatwindow.h"
+#include "xmpp/account.h"
+#include "xmpp/server.h"
+#include "xmpp/contacttreemodel.h"
+#include "xmpp/stream/stream.h"
+#include "accountdialog.h"
+#include "contactswidget.h"
+#include "tabholder.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -21,6 +24,10 @@ public:
     ~MainWindow();
 
 private:
+    void initMenuBar();
+    void initMetaTypes();
     Ui::MainWindow *ui;
+private slots:
+    void connectAccount();
 };
 #endif // MAINWINDOW_H

@@ -34,7 +34,8 @@ QT_END_NAMESPACE
     WORD(status)        \
     WORD(priority)      \
     WORD(body)          \
-    WORD(subject)
+    WORD(subject)       \
+    WORD(thread)
 
 #define LAMBDA_ENUM(ENUM)       [](){ return XMLWord::ENUM; }
 

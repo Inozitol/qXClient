@@ -2,57 +2,45 @@ QT       += core gui network xml
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
+INCLUDEPATH += . \
+               $$PWD
+
 CONFIG += c++17
+CONFIG += static
+
+include(sasl/sasl.pri)
+include(xmpp/xmpp.pri)
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-    account.cpp \
-    addressable.cpp \
-    chatchainmodel.cpp \
-    chatwindow.cpp \
-    contacts.cpp \
-    creds.cpp \
-    infoquery.cpp \
+    accountdialog.cpp \
+    chatwidget.cpp \
+    contactswidget.cpp \
     main.cpp \
     mainwindow.cpp \
-    message.cpp \
-    saslgenerator.cpp \
-    scramgenerator.cpp \
-    server.cpp \
-    stanza.cpp \
-    stream.cpp \
-    streamfeature.cpp \
     strswitch.cpp \
+    tabholder.cpp \
     utils.cpp
 
 HEADERS += \
-    account.h \
-    addressable.h \
-    chatchainmodel.h \
-    chatwindow.h \
-    contacts.h \
-    creds.h \
-    infoquery.h \
+    accountdialog.h \
+    chatwidget.h \
+    contactswidget.h \
     mainwindow.h \
-    message.h \
-    presence.h \
-    roster.h \
-    saslgenerator.h \
-    saslmechanisms.h \
-    scramgenerator.h \
-    server.h \
-    stanza.h \
-    stream.h \
-    streamfeature.h \
     strswitch.h \
+    tabholder.h \
     utils.h
 
 FORMS += \
-    chatwindow.ui \
-    mainwindow.ui
+    accountdialog.ui \
+    chatwidget.ui \
+    contactswidget.ui \
+    loginwidget.ui \
+    mainwindow.ui \
+    tabholder.ui
 
 TRANSLATIONS += \
     qXClient_en_US.ts
