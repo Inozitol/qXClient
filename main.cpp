@@ -8,6 +8,11 @@ int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
 
+
+    QCoreApplication::setOrganizationName("Chochruniska");
+    QCoreApplication::setOrganizationDomain("chochrun.eu");
+    QCoreApplication::setApplicationName("qXClient");
+
     QTranslator translator;
     const QStringList uiLanguages = QLocale::system().uiLanguages();
     for (const QString &locale : uiLanguages) {

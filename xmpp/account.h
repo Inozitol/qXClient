@@ -16,6 +16,7 @@ public:
 
     Account(const jidfull_t& jid, const Credentials& cred);
     Account(const jidbare_t& jid, const Credentials& cred);
+    Account() = default;
 
     const Credentials &credentials() const;
 

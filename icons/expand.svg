@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <style>
+      .cls-1 {
+        fill-rule: evenodd;
+      }
+
+      .cls-2 {
+        fill: #fff;
+      }
+    </style>
+  </defs>
+  <path id="Color_Fill_1" data-name="Color Fill 1" class="cls-1" d="M0,0H32V32H0V0ZM2,2V30H30V2H2Z"/>
+  <rect id="Color_Fill_2_copy_2" data-name="Color Fill 2 copy 2" class="cls-2" x="2" y="2" width="28" height="28"/>
+  <rect x="14" y="4" width="4" height="24"/>
+  <rect x="4" y="14" width="24" height="4"/>
+</svg>

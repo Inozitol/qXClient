@@ -24,19 +24,19 @@ InfoQuery::InfoQuery(QXmlStreamReader& reader)
 
     for(const auto& attr : reader.attributes()){
         switch(word2int(attr.name().toUtf8())){
-        case XMLWord::to:
+        case IntFromString::to:
             setTo(attr.value().toUtf8());
             break;
-        case XMLWord::from:
+        case IntFromString::from:
             setFrom(attr.value().toUtf8());
             break;
-        case XMLWord::id:
+        case IntFromString::id:
             setId(attr.value().toUtf8());
             break;
-        case XMLWord::type:
+        case IntFromString::type:
             setType(attr.value().toUtf8());
             break;
-        case XMLWord::lang:
+        case IntFromString::lang:
             setLang(attr.value().toUtf8());
             break;
         default:

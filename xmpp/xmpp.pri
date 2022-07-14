@@ -18,6 +18,9 @@ HEADERS += \
 		$$PWD/contact.h \
 		$$PWD/contacttreemodel.h \
 		$$PWD/creds.h \
+		$$PWD/disco.h \
 		$$PWD/roster.h \
 		$$PWD/server.h \
 		$$PWD/treeitem.h
+
+RESOURCES +=

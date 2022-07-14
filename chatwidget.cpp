@@ -15,6 +15,15 @@ ChatWidget::~ChatWidget()
     delete(ui);
 }
 
+void ChatWidget::updateMetadata(const Contact &contact){
+    rosteritem_t roster = contact.getRoster();
+    if(!roster.name.isEmpty()){
+        ui->nameLabel->setText(roster.name);
+    }else{
+        ui->nameLabel->setText(roster.jid.local);
+    }
+}
+
 void ChatWidget::initSignals(){
     connect(ui->chatInput, &QLineEdit::returnPressed,
             this, &ChatWidget::prepareMessage);
@@ -23,12 +32,13 @@ void ChatWidget::initSignals(){
 }
 
 void ChatWidget::initLabels(const Contact& contact){
-    ui->nameLabel->setText(contact.getRoster().name);
+    updateMetadata(contact);
 }
 
 void ChatWidget::receiveMessage(const Message& msg){
     jidbare_t fromJid = msg.getFrom();
-    QString str = fromJid.local + " : " + msg.getBody();
+    QString time = msg.timestamp().toString("hh:mm:ss");
+    QString str = time + " | " + fromJid.local + " : " + msg.getBody();
     ui->chatView->addItem(str);
 }
 

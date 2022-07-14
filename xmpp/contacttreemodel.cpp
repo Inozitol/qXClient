@@ -3,10 +3,10 @@
 ContactTreeModel::ContactTreeModel(jidfull_t selfJid, QObject *parent)
     : QAbstractItemModel{parent}, _selfJid(selfJid)
 {
-    _rootItem = new ContactItem(ContactItem::ROOT, Contact());
-    _selfItem = new ContactItem(ContactItem::DATA, Contact(), _rootItem);
-    _o2oSpacer = new ContactItem(ContactItem::SPACER, Contact(), _rootItem);
-    _o2mSpacer = new ContactItem(ContactItem::SPACER, Contact(), _rootItem);
+    _rootItem = new ContactItem(ContactItem::Type::ROOT, Contact());
+    _selfItem = new ContactItem(ContactItem::Type::DATA, Contact(), _rootItem);
+    _o2oSpacer = new ContactItem(ContactItem::Type::SPACER, Contact(), _rootItem);
+    _o2mSpacer = new ContactItem(ContactItem::Type::SPACER, Contact(), _rootItem);
     _rootItem->appendChild(_selfItem);
     _rootItem->appendChild(_o2oSpacer);
     _rootItem->appendChild(_o2mSpacer);
@@ -85,10 +85,24 @@ QVariant ContactTreeModel::data(const QModelIndex& index, int role) const{
         return jid.local;
     }
         break;
+    case Qt::DecorationRole:
+        if(item->type() == ContactItem::Type::SPACER){
+            if(item->isExpanded()){
+                return DataHolder::instance().getIcon("collapse");
+            }else{
+                return DataHolder::instance().getIcon("expand");
+            }
+        }
+        if(cnt.isOnline()){
+            return DataHolder::instance().getIcon("online");
+        }else{
+            return DataHolder::instance().getIcon("offline");
+        }
+        break;
     case Qt::UserRole:
     {
         jidbare_t jid = cnt.getRoster().jid;
-        return jid.str();
+        return jid.toByteArray();
     }
     case Qt::UserRole+1:
     {
@@ -114,64 +128,28 @@ int ContactTreeModel::columnCount(const QModelIndex&) const{
     return 1;
 }
 
-/*
-bool ContactTreeModel::insertRows(int row, int count, const QModelIndex&){
-    beginInsertRows(QModelIndex(), row, row+count-1);
-
-    while(count--){
-        _cntList.insert(row, Contact());
-    }
-
-    endInsertRows();
-    return true;
-}
-
-bool ContactTreeModel::removeRows(int row, int count, const QModelIndex&){
-    beginRemoveRows(QModelIndex(), row, row+count-1);
-
-    while(count--){
-        _cntList.removeAt(row);
-    }
-
-    endRemoveRows();
-    return true;
-}
-
-bool ContactTreeModel::setData(const QModelIndex& index, const QVariant& value, int role){
-    if(index.isValid() && role == Qt::EditRole){
-        _cntList.replace(index.row(), qvariant_cast<Contact>(value));
-        emit dataChanged(index, index);
-        return true;
-    }
-    return false;
-}
-*/
-
 void ContactTreeModel::addContact(const Contact& contact){
-    /*
-    insertRow(_cntList.count());
-    QModelIndex index = createIndex(_cntList.count()-1, 0);
-    QVariant data;
-    data.setValue(contact);
-    setData(index,data);
-    */
-
-    jidbare_t jid = contact.getRoster().jid;
+    const jidbare_t jid = contact.getRoster().jid;
 
     if(jid == _selfJid.bare()){
         _selfItem->setData(contact);
-        _jidContacts.insert(jid, _selfItem);
+        m_umapContacts.insert({jid, _selfItem});
         QModelIndex selfIndex = index(0, 0, QModelIndex());
         emit dataChanged(selfIndex, selfIndex);
     }else{
-        ContactItem* item = new ContactItem(ContactItem::DATA, contact, _o2oSpacer);
+        ContactItem* item = new ContactItem(ContactItem::Type::DATA, contact, _o2oSpacer);
         _o2oSpacer->appendChild(item);
-        _jidContacts.insert(jid, item);
+        m_umapContacts.insert({jid, item});
     }
 }
 
 QModelIndex ContactTreeModel::indexByJid(const jidbare_t& jid) const{
-    ContactItem* item = _jidContacts.value(jid);
+    ContactItem* item;
+    try{
+        item = m_umapContacts.at(jid);
+    }catch(const std::out_of_range&){
+        item = nullptr;
+    }
     QModelIndex index = indexOf(item);
     return index;
 }
@@ -203,6 +181,27 @@ void ContactTreeModel::insertPresence(const Presence& presence){
     emit dataChanged(index, index);
 }
 
+void ContactTreeModel::removePresence(const Presence &presence){
+    jidbare_t jid = presence.getFrom();
+    QModelIndex index = indexByJid(jid);
+    if(!index.isValid()){
+        rosteritem_t roster;
+        roster.jid = jid;
+        Contact contact(roster);
+        addContact(contact);
+        index = indexByJid(jid);
+    }
+    ContactItem* item = static_cast<ContactItem*>(index.internalPointer());
+    item->dataPtr()->removePresence(jidfull_t(presence.getFrom()));
+    emit dataChanged(index, index);
+}
+
+void ContactTreeModel::setExpanded(const QModelIndex &index, bool value){
+    ContactItem* item = static_cast<ContactItem*>(index.internalPointer());
+    item->setExpanded(value);
+    emit dataChanged(index, index);
+}
+
 Presence ContactTreeModel::getPresence(const jidfull_t& jid) const{
     QModelIndex index = indexByJid(jid);
     const ContactItem* item = static_cast<const ContactItem*>(index.constInternalPointer());
@@ -221,9 +220,9 @@ void ContactTreeModel::setRoster(const rosteritem_t& roster){
     if(!index.isValid()){
         Contact contact(roster);
         addContact(contact);
-        index = indexByJid(jid);
     }else{
         ContactItem* item = static_cast<ContactItem*>(index.internalPointer());
         item->dataPtr()->setRoster(roster);
+        emit dataChanged(index, index);
     }
 }

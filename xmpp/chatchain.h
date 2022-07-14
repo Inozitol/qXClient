@@ -25,6 +25,8 @@ private:
     void includeMessage(const Message& msg);
     void includeMessage(Message&& msg);
 
+    void connectNotify(const QMetaMethod& signal);
+
     QList<Message> _msgList{};
     Stream* _stream;
     jidfull_t _receiver;
@@ -33,8 +35,9 @@ public slots:
     void prepareMessage(Message& msg);
 
 signals:
-    void receivedMessage(const Message&);
+    void receivedMessage(const Message& msg);
     void sendMessage(Message& msg);
+    void synchronizeMessages(const Message& msg);
 };
 
 #endif // CHATCHAIN_H

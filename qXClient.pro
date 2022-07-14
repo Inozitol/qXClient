@@ -6,7 +6,6 @@ INCLUDEPATH += . \
                $$PWD
 
 CONFIG += c++17
-CONFIG += static
 
 include(sasl/sasl.pri)
 include(xmpp/xmpp.pri)
@@ -17,30 +16,36 @@ include(xmpp/xmpp.pri)
 
 SOURCES += \
     accountdialog.cpp \
+    accountwidget.cpp \
     chatwidget.cpp \
     contactswidget.cpp \
+    dataholder.cpp \
     main.cpp \
     mainwindow.cpp \
+    serverinfodialog.cpp \
     strswitch.cpp \
-    tabholder.cpp \
     utils.cpp
 
 HEADERS += \
     accountdialog.h \
+    accountwidget.h \
     chatwidget.h \
     contactswidget.h \
+    dataholder.h \
     mainwindow.h \
+    serverinfodialog.h \
+    settings.h \
     strswitch.h \
-    tabholder.h \
     utils.h
 
 FORMS += \
     accountdialog.ui \
+    accountwidget.ui \
     chatwidget.ui \
     contactswidget.ui \
     loginwidget.ui \
     mainwindow.ui \
-    tabholder.ui
+    serverinfodialog.ui
 
 TRANSLATIONS += \
     qXClient_en_US.ts
@@ -51,3 +56,6 @@ CONFIG += embed_translations
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+RESOURCES += qdarkstyle/theme/darkstyle.qrc \
+  icons/icons.qrc

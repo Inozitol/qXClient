@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/usermeta">
+        <file>offline.svg</file>
+        <file>online.svg</file>
+        <file>expand.svg</file>
+        <file>collapse.svg</file>
+    </qresource>
+    <qresource prefix="/">
+        <file>appicon.jpg</file>
+    </qresource>
+</RCC>

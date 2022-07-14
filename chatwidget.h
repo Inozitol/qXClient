@@ -18,6 +18,8 @@ public:
     ChatWidget(const Contact& contact, QWidget *parent = nullptr);
     ~ChatWidget();
 
+    void updateMetadata(const Contact& contact);
+
 private:
     void initSignals();
     void initLabels(const Contact& contact);

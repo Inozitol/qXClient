@@ -10,26 +10,39 @@ AccountDialog::AccountDialog(Purpose purpose, QWidget* parent)
     switch(purpose){
     case Purpose::LOGIN:
         LoginWidget* loginWidget = new LoginWidget(this);
-        connect(loginWidget, &LoginWidget::loginSuccessful,
-                this, &AccountDialog::loginSuccessful);
+
         ui->stackedWidget->addWidget(loginWidget);
         ui->stackedWidget->setCurrentWidget(loginWidget);
         break;
     }
 }
 
-void AccountDialog::loginSuccessful(){
-    accept();
+const Account& AccountDialog::account(){
+    return m_account;
 }
 
-LoginWidget::LoginWidget(QWidget *parent) :
+const Server& AccountDialog::server(){
+    return m_server;
+}
+
+void AccountDialog::loginPushed(){
+    Stream* stream = StreamPool::instance().newStream(m_account,m_server);
+    connect(stream, &Stream::coreEstablished,
+            this, &QDialog::accept);
+}
+
+LoginWidget::LoginWidget(AccountDialog* parent) :
     QWidget(parent),
     ui(new Ui::LoginWidget),
-    _label_font("Arial", 25, QFont::Bold)
+    _label_font("Arial", 25, QFont::Bold),
+    m_wigAccDialog(parent)
 {
     ui->setupUi(this);
+
     connect(ui->loginButton, &QPushButton::clicked,
-            this, &LoginWidget::loginPushed);
+            this, &LoginWidget::createLoginData);
+    connect(ui->loginButton, &QPushButton::clicked,
+            m_wigAccDialog, &AccountDialog::loginPushed);
 }
 
 void LoginWidget::initUI(){
@@ -41,14 +54,11 @@ LoginWidget::~LoginWidget()
     delete(ui);
 }
 
-void LoginWidget::loginPushed(){
+void LoginWidget::createLoginData(){
     jidbare_t jid(ui->accountLine->text().toUtf8());
     Credentials creds(ui->passwordLine->text().toUtf8());
     quint16 port = ui->portLine->text().toInt();
 
-    std::shared_ptr<Account> acc = std::make_shared<Account>(jid, creds);
-    std::shared_ptr<Server> srv = std::make_shared<Server>(jid, port);
-    Stream* stream = StreamPool::instance().newStream(acc, srv);
-    connect(stream, &Stream::coreEstablished,
-            this, &LoginWidget::loginSuccessful);
+    m_wigAccDialog->m_account = Account(jid, creds);
+    m_wigAccDialog->m_server = Server(jid, port);
 }

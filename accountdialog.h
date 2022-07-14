@@ -24,19 +24,28 @@ public:
         LOGIN
     };
 
-    explicit AccountDialog(Purpose purpose, QWidget* parent = nullptr);
+    AccountDialog(Purpose purpose, QWidget* parent = nullptr);
+
+    const Account& account();
+    const Server&  server();
 
 private:
     Ui::AccountDialog* ui;
+
+    Account m_account;
+    Server  m_server;
+
+    friend class LoginWidget;
+
 private slots:
-    void loginSuccessful();
+    void loginPushed();
 };
 
 class LoginWidget : public QWidget
 {
     Q_OBJECT
 public:
-    explicit LoginWidget(QWidget* parent = nullptr);
+    LoginWidget(AccountDialog* parent = nullptr);
     ~LoginWidget();
 
 private:
@@ -45,8 +54,10 @@ private:
     void initUI();
 
     QFont _label_font;
+    QSettings m_settings;
+    AccountDialog* m_wigAccDialog;
 private slots:
-    void loginPushed();
+    void createLoginData();
 signals:
     void loginSuccessful();
 };

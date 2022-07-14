@@ -15,6 +15,7 @@ Contact::Contact(const Contact &contact, QObject* parent)
 {
     _roster = contact._roster;
     _presences = contact._presences;
+    m_isOnline = contact.m_isOnline;
     //_chat_chain = contact._chat_chain;
 }
 
@@ -23,6 +24,7 @@ Contact::Contact(Contact&& contact, QObject* parent)
 {
     _roster = contact._roster;
     _presences = contact._presences;
+    m_isOnline = contact.m_isOnline;
     //_chat_chain = contact._chat_chain;
     //contact._chat_chain = nullptr;
 }
@@ -39,6 +41,7 @@ Contact& Contact::operator=(const Contact& contact)
 
     _roster = contact._roster;
     _presences = contact._presences;
+    m_isOnline = contact.m_isOnline;
 
     //delete _chat_chain;
     //std::copy(contact._chat_chain, contact._chat_chain, _chat_chain);
@@ -54,6 +57,7 @@ Contact& Contact::operator=(Contact&& contact) noexcept
 
     _roster = contact._roster;
     _presences = contact._presences;
+    m_isOnline = contact.m_isOnline;
 
     //delete _chat_chain;
     //_chat_chain = std::exchange(contact._chat_chain, nullptr);
@@ -67,10 +71,30 @@ void Contact::setRoster(const rosteritem_t &roster){
 
 void Contact::insertPresence(const jidfull_t& jid, const Presence& presence){
     _presences[jid.resource] = presence;
+    m_isOnline = true;
 }
 
 void Contact::insertPresence(const QByteArray& resource, const Presence& presence){
     _presences[resource] = presence;
+    m_isOnline = true;
+}
+
+void Contact::removePresence(const jidfull_t &jid){
+    if(_presences.contains(jid.resource)){
+        _presences.remove(jid.resource);
+    }
+    if(_presences.count() == 0){
+        m_isOnline = false;
+    }
+}
+
+void Contact::removePresence(const QByteArray &resource){
+    if(_presences.contains(resource)){
+        _presences.remove(resource);
+    }
+    if(_presences.count() == 0){
+        m_isOnline = false;
+    }
 }
 
 Presence Contact::getPresence(const jidfull_t& jid) const{
@@ -85,3 +109,6 @@ rosteritem_t Contact::getRoster() const{
     return _roster;
 }
 
+bool Contact::isOnline(){
+    return m_isOnline;
+}

@@ -1,20 +1,20 @@
 #include "streamfeature.h"
 
-FeatureType operator|(FeatureType l, FeatureType r){
-    return static_cast<FeatureType>(
-                static_cast<std::underlying_type_t<FeatureType>>(l) |
-                static_cast<std::underlying_type_t<FeatureType>>(r)
+Feature::Type operator|(Feature::Type l, Feature::Type r){
+    return static_cast<Feature::Type>(
+                static_cast<std::underlying_type_t<Feature::Type>>(l) |
+                static_cast<std::underlying_type_t<Feature::Type>>(r)
                 );
 }
 
-FeatureType operator|=(FeatureType& l, FeatureType r){
+Feature::Type operator|=(Feature::Type& l, Feature::Type r){
     l = l | r;
     return l;
 }
 
-FeatureType operator&(FeatureType l, FeatureType r){
-    return static_cast<FeatureType>(
-                static_cast<std::underlying_type_t<FeatureType>>(l) &
-                static_cast<std::underlying_type_t<FeatureType>>(r)
-                );
+bool operator&(Feature::Type l, Feature::Type r){
+    return static_cast<Feature::Type>(
+                static_cast<std::underlying_type_t<Feature::Type>>(l) &
+                static_cast<std::underlying_type_t<Feature::Type>>(r)
+                ) == r;
 }

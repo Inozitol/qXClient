@@ -26,9 +26,12 @@ public:
     void setRoster(const rosteritem_t& roster);
     void insertPresence(const jidfull_t& jid, const Presence& presence);
     void insertPresence(const QByteArray& resource, const Presence& presence);
+    void removePresence(const jidfull_t& jid);
+    void removePresence(const QByteArray& resource);
     Presence getPresence(const jidfull_t& jid) const;
     Presence getPresence(const QByteArray& resource) const;
     rosteritem_t getRoster() const;
+    bool isOnline();
     //ChatChain* getChatChain();
 
     //void insertMessage(const Message& message);
@@ -36,8 +39,9 @@ public:
 
 private:
     rosteritem_t _roster{};
-    QMap<QByteArray, Presence> _presences;
+    QHash<QByteArray, Presence> _presences;
     //ChatChain* _chat_chain = nullptr;
+    bool m_isOnline = false;
 
 signals:
     void newMessage(const Message& msg);

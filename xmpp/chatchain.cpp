@@ -57,9 +57,17 @@ void ChatChain::includeMessage(Message &&msg){
     }
 }
 
+void ChatChain::connectNotify(const QMetaMethod &signal){
+    if(signal == QMetaMethod::fromSignal(&ChatChain::synchronizeMessages)){
+        for(const auto& msg : _msgList){
+            emit synchronizeMessages(msg);
+        }
+    }
+}
+
 void ChatChain::prepareMessage(Message& msg){
-    msg.setFrom(_stream->accountJid().str());
-    msg.setTo(_receiver.str());
+    msg.setFrom(_stream->accountJid().toByteArray());
+    msg.setTo(_receiver.toByteArray());
     msg.setType("chat");
     emit sendMessage(msg);
     includeMessage(std::move(msg));

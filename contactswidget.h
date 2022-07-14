@@ -12,7 +12,6 @@ class ContactsWidget;
 class ContactsWidget : public QWidget
 {
     Q_OBJECT
-
 public:
     explicit ContactsWidget(ContactTreeModel* model, QWidget *parent = nullptr);
     ~ContactsWidget();

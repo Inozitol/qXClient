@@ -6,6 +6,11 @@
 class Message : public Stanza
 {
 public:
+    enum Flag{
+        DELAYED = 1 << 0
+    };
+    Q_DECLARE_FLAGS(Flags, Flag);
+
     Message();
     Message(const Message& message);
     Message(Message&& message);
@@ -26,6 +31,9 @@ public:
     void setThreadParent(QByteArray&& thread);
     void setThreadParent();
 
+    void setFlag(Flag flgs);
+    bool isDelayed();
+
     static const unsigned int THREAD_LEN = 10;
 private:
     QHash<QLocale, QString> _body_map;
@@ -33,8 +41,10 @@ private:
     QByteArray _threadParent;
     QByteArray _thread;
     QDomElement _threadElem;
+    Flags m_flgFlags;
 };
 
+Q_DECLARE_OPERATORS_FOR_FLAGS(Message::Flags);
 Q_DECLARE_METATYPE(Message);
 
 #endif // MESSAGE_H

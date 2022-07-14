@@ -7,53 +7,83 @@
 #include "../../sasl/saslmechanisms.h"
 #include "../stanza/infoquery.h"
 
-enum class FeatureType : quint32{
-    UNKNOWN,
-    STARTTLS =      1 << 0,
-    SASL =          1 << 1,
-    RESOURCEBIND =  1 << 2
-};
-
-FeatureType operator|(FeatureType l, FeatureType r);
-FeatureType operator|=(FeatureType& l, FeatureType r);
-FeatureType operator&(FeatureType l, FeatureType r);
 
 struct Feature{
-    Feature(FeatureType type_) : type(type_){}
-    FeatureType type = FeatureType::UNKNOWN;
+    enum class Type : quint32{
+        UNKNOWN,
+        STARTTLS =      1 << 0,
+        SASL =          1 << 1,
+        RESOURCEBIND =  1 << 2,
+        MANAGEMENT =    1 << 3,
+    };
+
+    friend Type operator|(Type l, Type r);
+    friend Type operator|=(Type& l, Type r);
+    friend bool operator&(Type l, Type r);
+
+    Feature(Type type_) : type(type_){}
+    Type type = Type::UNKNOWN;
     bool required = false;
 };
 
-enum class StateSTARTTLS{
-    ASK,
-    PROCEED,
-    FAILURE
-};
 
 struct FeatureSTARTTLS : Feature{
-    FeatureSTARTTLS() : Feature(FeatureType::STARTTLS){};
-    StateSTARTTLS state = StateSTARTTLS::ASK;
-};
-
-enum class StateSASL{
-    AUTH,
-    CHALLENGE,
-    SUCCESS
+    enum class State{
+        ASK,
+        PROCEED,
+        FAILURE
+    };
+    FeatureSTARTTLS() : Feature(Feature::Type::STARTTLS){};
+    State state = State::ASK;
 };
 
 struct FeatureSASL : Feature{
-    FeatureSASL() : Feature(FeatureType::SASL){};
+    enum class State{
+        AUTH,
+        CHALLENGE,
+        SUCCESS
+    };
+    FeatureSASL() : Feature(Feature::Type::SASL){};
     QSet<QString> srv_mechanisms;
-    StateSASL state = StateSASL::AUTH;
+    State state = State::AUTH;
     SASLSupported mechanism;
     QByteArray challenge;
     QByteArray server_sig;
 };
 
 struct FeatureBind : Feature{
-    FeatureBind() : Feature(FeatureType::RESOURCEBIND){};
+    FeatureBind() : Feature(Feature::Type::RESOURCEBIND){};
     QByteArray query_id;
     InfoQuery result;
+};
+
+struct FeatureManagement : Feature{
+    enum class State{
+        ASK,
+        ENABLED
+    };
+
+    void incrInbound(){
+        if(inbound == UINT_MAX){
+            inbound = 0;
+        }else{
+            inbound++;
+        }
+    }
+
+    void incrOutbound(){
+        if(outbound == UINT_MAX){
+            outbound = 0;
+        }else{
+            outbound++;
+        }
+    }
+
+    FeatureManagement() : Feature(Feature::Type::MANAGEMENT){};
+    State state = State::ASK;
+    quint32 inbound = 0;
+    quint32 outbound = 0;
+    bool ack_wait = false;
 };
 
 #endif // STREAMFEATURE_H

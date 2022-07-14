@@ -16,7 +16,7 @@ struct rosteritem_t{
 
     rosteritem_t(QDomElement roster_root){
         if(roster_root.nodeName() != "item"){
-            throw std::invalid_argument("rosteritem_it expects DOM element of item");
+            throw std::invalid_argument("rosteritem_t expects DOM element of item");
         }
         approved =  roster_root.attribute("approved") == "true";
         ask =       roster_root.attribute("ask").toUtf8();

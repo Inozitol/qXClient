@@ -7,12 +7,11 @@ class StreamPool : public QObject
 {
     Q_OBJECT
 public:
-    Stream* newStream(std::shared_ptr<Account> acc, std::shared_ptr<Server> srv);
+    Stream* newStream(const Account& account, const Server& server);
     Stream* getStream(const jidbare_t& jid) const;
-    Stream* getLast() const;
+    Stream* lastStream() const;
 
     static StreamPool& instance();
-
 
 private:
     StreamPool() = default;
@@ -21,8 +20,11 @@ private:
 
     ~StreamPool();
 
-    QMap<jidbare_t, Stream*> _streams;
-    Stream* _last_inserted = nullptr;
+    std::unordered_map<jidbare_t, Stream*> m_umapStreams;
+    Stream* m_ptrLastStream = nullptr;
+
+signals:
+    void disconnectAll();
 };
 
 #endif // STREAMPOOL_H

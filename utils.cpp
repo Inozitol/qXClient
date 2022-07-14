@@ -1,7 +1,7 @@
 #include "utils.h"
 
 namespace Utils{
-QByteArray getRandomString(int len){
+QByteArray randomString(int len){
     QByteArray result;
     for(; len>0; --len){
         char rando_char;
@@ -19,10 +19,14 @@ QByteArray getXOR(const QByteArray& arr1, const QByteArray& arr2){
     qsizetype iter = std::max({len1, len2});
     QByteArray result;
     for(int i = 0; i < iter; i++){
-        char val = arr1.at(i%len1) ^ arr2.at(i%len2);
+        char val = arr1.at(i % len1) ^ arr2.at(i % len2);
         result.append(val);
     }
     return result;
+}
+
+QByteArray getXOR(const QString& str1, const QString& str2){
+    return getXOR(str1.toUtf8(), str2.toUtf8());
 }
 
 void reader2node(QDomDocument& doc, QDomNode& node, QXmlStreamReader& reader){
@@ -61,5 +65,14 @@ void reader2node(QDomDocument& doc, QDomNode& node, QXmlStreamReader& reader){
         token = reader.readNext();
         name = reader.name().toUtf8();
     }
+}
+
+QByteArray simpleEncryption(const QByteArray& data, const QByteArray& key){
+    QByteArray output;
+    qsizetype keyLen = key.length();
+    for(int i=0; i<data.length(); i++){
+        output.append(data.at(i) ^ key.at(i % keyLen));
+    }
+    return output;
 }
 }

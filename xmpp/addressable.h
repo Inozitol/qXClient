@@ -34,16 +34,16 @@ struct jidbare_t{
         return debug;
     }
 
-    friend bool operator==(const jidbare_t& l, const jidbare_t& r){
-        if(l.domain != r.domain)        return false;
-        if(l.local != r.local)          return false;
+    bool operator==(const jidbare_t& other) const{
+        if(this->domain != other.domain) return false;
+        if(this->local  != other.local)  return false;
         return true;
     }
 
-    friend bool operator<(const jidbare_t& l, const jidbare_t& r){
-        QByteArray l_str = l.domain+l.local;
-        QByteArray r_str = r.domain+r.local;
-        return l_str < r_str;
+    inline bool operator<(const jidbare_t& other) const{
+        QByteArray t_str = this->domain + this->local;
+        QByteArray o_str = other.domain + other.local;
+        return t_str < o_str;
     }
 
     jidbare_t& operator=(const jidbare_t&)=default;
@@ -73,6 +73,8 @@ struct jidbare_t{
         }
     }
 
+    jidbare_t(const QString& in) : jidbare_t(in.toUtf8()){}
+
     jidbare_t(const QByteArray& domain_, const QByteArray& local_){
         domain = domain_;
         local = local_;
@@ -99,7 +101,7 @@ struct jidbare_t{
 
     jidbare_t()=default;
 
-    QByteArray str(){
+    QByteArray toByteArray(){
         QByteArray arr;
         arr << *this;
         return arr;
@@ -136,17 +138,17 @@ struct jidfull_t : jidbare_t{
         return debug;
     }
 
-    friend bool operator==(const jidfull_t& l, const jidfull_t& r){
-        if(l.domain != r.domain)        return false;
-        if(l.local != r.local)          return false;
-        if(l.resource != r.resource)    return false;
+    inline bool operator==(const jidfull_t& other) const{
+        if(this->domain   != other.domain)   return false;
+        if(this->local    != other.local)    return false;
+        if(this->resource != other.resource) return false;
         return true;
     }
 
-    friend bool operator<(const jidfull_t& l, const jidfull_t& r){
-        QByteArray l_str = l.domain+l.local+l.resource;
-        QByteArray r_str = r.domain+r.local+r.resource;
-        return l_str < r_str;
+    inline bool operator<(const jidfull_t& other) const{
+        QByteArray t_str = this->domain + this->local + this->resource;
+        QByteArray o_str = other.domain + other.local + other.resource;
+        return t_str < o_str;
     }
 
     jidfull_t& operator=(const jidfull_t&)=default;
@@ -188,6 +190,8 @@ struct jidfull_t : jidbare_t{
         }
     }
 
+    jidfull_t(const QString& in) : jidfull_t(in.toUtf8()){}
+
     jidfull_t(const QByteArray& domain_, const QByteArray& local_, const QByteArray& resource_)
         : jidbare_t(domain_, local_)
     {
@@ -217,7 +221,7 @@ struct jidfull_t : jidbare_t{
 
     jidfull_t()=default;
 
-    QByteArray str(){
+    QByteArray toByteArray(){
         QByteArray arr;
         arr << *this;
         return arr;
@@ -226,6 +230,22 @@ struct jidfull_t : jidbare_t{
     jidbare_t bare() const{
         jidbare_t bareJid(*this);
         return bareJid;
+    }
+};
+
+template<>
+struct std::hash<jidbare_t>{
+    std::size_t operator()(const jidbare_t& jid) const noexcept{
+        QByteArray join = jid.domain + jid.local;
+        return std::hash<std::string>{}(join.toStdString());
+    }
+};
+
+template<>
+struct std::hash<jidfull_t>{
+    std::size_t operator()(const jidfull_t& jid) const noexcept{
+        QByteArray join = jid.domain + jid.local + jid.resource;
+        return std::hash<std::string>{}(join.toStdString());
     }
 };
 
@@ -241,10 +261,11 @@ public:
 
     Addressable(const jidfull_t& jid);
     Addressable(jidfull_t&& jid);
+    Addressable() = default;
 
     void setJid(const jidfull_t& jid);
     void setJid(jidfull_t&& jid);
-    jidfull_t jid();
+    jidfull_t jid() const;
 
 protected:
     jidfull_t _jid;

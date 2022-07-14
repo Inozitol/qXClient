@@ -20,32 +20,35 @@ public:
     Stanza(const Stanza& stanza);
     Stanza(Stanza&& stanza);
 
-    Stanza& operator=(const Stanza&)=default;
+    Stanza& operator=(const Stanza&) = default;
 
     void setTo(QByteArray data);
     void setFrom(QByteArray data);
     void setId(QByteArray data);
-    void setId();
+    void generateID();
     void setType(QByteArray data);
     void setLang(QByteArray data);
     QByteArray getTo() const;
     QByteArray getFrom() const;
-    QByteArray getId() const;
+    QByteArray getID() const;
     QByteArray getType() const;
     QByteArray getLang() const;
 
+    QDateTime timestamp() const;
+
+    void setAttribute(const QByteArray& name, const QByteArray& content);
     void insertNode(const QDomNode& node);
-    QDomNode root();
-    QByteArray str();
+    QDomNode root() const;
+    QByteArray str() const;
+    Type type() const;
 
     static const unsigned int ID_LEN = 5;
 protected:
     QDomNode _stanza;
     QLocale _def_locale = QLocale("en");
-private:
     QDateTime _timestamp;
+private:
     Type _type;
-
 };
 
 #endif // STANZA_H

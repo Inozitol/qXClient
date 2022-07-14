@@ -22,7 +22,7 @@ Addressable::Addressable(jidfull_t&& jid)
     :_jid(jid)
 {}
 
-jidfull_t Addressable::jid(){
+jidfull_t Addressable::jid() const{
     return _jid;
 }
 

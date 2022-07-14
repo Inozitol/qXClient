@@ -2,6 +2,12 @@
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
+  <property name="windowModality">
+   <enum>Qt::NonModal</enum>
+  </property>
+  <property name="enabled">
+   <bool>true</bool>
+  </property>
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -20,7 +26,7 @@
    <enum>Qt::ToolButtonIconOnly</enum>
   </property>
   <property name="animated">
-   <bool>true</bool>
+   <bool>false</bool>
   </property>
   <property name="documentMode">
    <bool>false</bool>
@@ -28,11 +34,14 @@
   <property name="tabShape">
    <enum>QTabWidget::Rounded</enum>
   </property>
-  <property name="dockOptions">
-   <set>QMainWindow::AllowTabbedDocks|QMainWindow::AnimatedDocks</set>
+  <property name="unifiedTitleAndToolBarOnMac">
+   <bool>false</bool>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
+    <property name="sizeConstraint">
+     <enum>QLayout::SetDefaultConstraint</enum>
+    </property>
     <property name="leftMargin">
      <number>0</number>
     </property>
@@ -49,23 +58,12 @@
      <number>0</number>
     </property>
     <item row="0" column="0">
-     <widget class="QTabWidget" name="tabWidget">
+     <widget class="QStackedWidget" name="accountStack">
       <property name="enabled">
        <bool>false</bool>
       </property>
-      <property name="currentIndex">
-       <number>0</number>
-      </property>
-      <widget class="QWidget" name="tab">
-       <attribute name="title">
-        <string>Tab 1</string>
-       </attribute>
-      </widget>
-      <widget class="QWidget" name="tab_2">
-       <attribute name="title">
-        <string>Tab 2</string>
-       </attribute>
-      </widget>
+      <widget class="QWidget" name="stackedWidgetPage1"/>
+      <widget class="QWidget" name="stackedWidgetPage2"/>
      </widget>
     </item>
    </layout>
@@ -85,9 +83,15 @@
     </property>
     <addaction name="actionConnect"/>
    </widget>
+   <widget class="QMenu" name="menuServer">
+    <property name="title">
+     <string>Server</string>
+    </property>
+    <addaction name="actionInfo"/>
+   </widget>
    <addaction name="menuConnection"/>
+   <addaction name="menuServer"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
   <action name="actionConnect">
    <property name="text">
     <string>Connect</string>
@@ -101,6 +105,11 @@
   <action name="actionShow">
    <property name="text">
     <string>Show</string>
+   </property>
+  </action>
+  <action name="actionInfo">
+   <property name="text">
+    <string>Info</string>
    </property>
   </action>
  </widget>

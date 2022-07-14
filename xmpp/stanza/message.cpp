@@ -31,19 +31,19 @@ Message::Message(QXmlStreamReader& reader)
 
     for(const auto& attr : reader.attributes()){
         switch(word2int(attr.name().toUtf8())){
-        case XMLWord::to:
+        case IntFromString::to:
             setTo(attr.value().toUtf8());
             break;
-        case XMLWord::from:
+        case IntFromString::from:
             setFrom(attr.value().toUtf8());
             break;
-        case XMLWord::id:
+        case IntFromString::id:
             setId(attr.value().toUtf8());
             break;
-        case XMLWord::type:
+        case IntFromString::type:
             setType(attr.value().toUtf8());
             break;
-        case XMLWord::lang:
+        case IntFromString::lang:
             setLang(attr.value().toUtf8());
             break;
         default:
@@ -57,7 +57,7 @@ Message::Message(QXmlStreamReader& reader)
     for(int i=0; i<msg_child_list.length(); i++){
         QDomElement curr_item = msg_child_list.at(i).toElement();
         switch(word2int(curr_item.tagName().toUtf8())){
-        case XMLWord::body:
+        case IntFromString::body:
         {
             QString text = curr_item.text().toUtf8();
             QByteArray lang = curr_item.attribute("lang").toUtf8();
@@ -68,7 +68,7 @@ Message::Message(QXmlStreamReader& reader)
             }
         }
             break;
-        case XMLWord::subject:
+        case IntFromString::subject:
         {
             QString text = curr_item.text();
             QByteArray lang = curr_item.attribute("lang").toUtf8();
@@ -79,7 +79,7 @@ Message::Message(QXmlStreamReader& reader)
             }
         }
             break;
-        case XMLWord::thread:
+        case IntFromString::thread:
         {
             QString thread = curr_item.text();
             setThread(thread.toUtf8());
@@ -87,6 +87,13 @@ Message::Message(QXmlStreamReader& reader)
                 QString parent = curr_item.attribute("parent");
                 setThreadParent(parent.toUtf8());
             }
+        }
+            break;
+        case IntFromString::delay:
+        {
+            QString strTimestamp = curr_item.attribute("stamp");
+            _timestamp = QDateTime::fromString(strTimestamp, Qt::ISODate);
+            m_flgFlags |= Flag::DELAYED;
         }
             break;
         default:
@@ -153,7 +160,7 @@ void Message::setThread(QByteArray &&thread){
 }
 
 void Message::setThread(){
-    QByteArray thread = Utils::getRandomString(THREAD_LEN);
+    QByteArray thread = Utils::randomString(THREAD_LEN);
 
     QDomElement bodyElem = createElement("thread");
     QDomText textNode = createTextNode(thread);
@@ -179,10 +186,18 @@ void Message::setThreadParent(QByteArray&& thread){
 }
 
 void Message::setThreadParent(){
-    QByteArray thread = Utils::getRandomString(THREAD_LEN);
+    QByteArray thread = Utils::randomString(THREAD_LEN);
 
     if(_thread.isEmpty()){
         setThread();
     }
     _threadElem.setAttribute("parent", std::move(thread));
+}
+
+void Message::setFlag(Flag flgs){
+    m_flgFlags |= flgs;
+}
+
+bool Message::isDelayed(){
+    return m_flgFlags.testFlag(Flag::DELAYED);
 }

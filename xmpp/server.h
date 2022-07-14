@@ -8,15 +8,12 @@
 class Server : public Addressable
 {
 public:
-    Server(const QByteArray& domain,
-           quint16 port,
-           const QByteArray& local="",
-           const QByteArray& resource="");
+    Server(const QByteArray& domain, quint16 port);
+    Server(const jidbare_t& jid, quint16 port);
+    Server() = default;
 
-    Server(const jidfull_t& jid,
-           quint16 port);
-
-    quint16 port();
+    void setPort(quint16 port);
+    quint16 getPort();
 
 private:
     quint16 _port;

@@ -7,9 +7,9 @@
 class Credentials{
 public:
     Credentials(QByteArray pass);
+    Credentials() = default;
 
-    QByteArray hashIterate(QCryptographicHash::Algorithm hash, unsigned int iter);
-
+    void setPass(QByteArray pass);
     const QByteArray &getPass() const;
 
 private:

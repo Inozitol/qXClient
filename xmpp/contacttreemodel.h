@@ -5,6 +5,7 @@
 
 #include "contact.h"
 #include "treeitem.h"
+#include "../dataholder.h"
 
 class ContactTreeModel : public QAbstractItemModel
 {
@@ -21,9 +22,6 @@ public:
     QVariant data(const QModelIndex& index, int role) const;
     Qt::ItemFlags flags(const QModelIndex& index) const;
     int columnCount(const QModelIndex& parent = QModelIndex()) const;
-    //bool insertRows(int row, int count, const QModelIndex& parent = QModelIndex());
-    //bool removeRows(int row, int count, const QModelIndex& parent = QModelIndex());
-    //bool setData(const QModelIndex& parent, const QVariant& value, int role = Qt::EditRole);
 
     void addContact(const Contact& contact);
     QModelIndex indexByJid(const jidbare_t& jid) const;
@@ -34,13 +32,18 @@ public:
 
     void setRoster(const rosteritem_t& roster);
     void insertPresence(const Presence& presence);
+    void removePresence(const Presence& presence);
+
+    void setExpanded(const QModelIndex& index, bool value);
+
 private:
     ContactItem* _rootItem;
     ContactItem* _selfItem;
     ContactItem* _o2oSpacer;
     ContactItem* _o2mSpacer;
     jidfull_t _selfJid;
-    QMap<jidbare_t, ContactItem*> _jidContacts;
+    std::unordered_map<jidbare_t, ContactItem*> m_umapContacts;
+    static const QHash<QString, QIcon> m_iconReference;
 signals:
     void newMessage(const Message& msg);
 };

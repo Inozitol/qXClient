@@ -7,7 +7,7 @@ template <class T>
 class TreeItem
 {
 public:
-    enum Type{
+    enum class Type{
         ROOT,
         SPACER,
         DATA
@@ -22,17 +22,20 @@ public:
     TreeItem<T> *child(int row);
     TreeItem<T> *parent();
     int childCount() const;
-    T data() const;
+    const T& data() const;
     T* dataPtr();
     void setData(const T& data);
     int row() const;
     Type type() const;
+    bool isExpanded() const;
+    void setExpanded(bool value);
 
 private:
     QVector<TreeItem*> _childItems;
     T _itemData;
     TreeItem<T> *_parentItem;
     const Type _type;
+    bool m_isExpanded = false;
 };
 
 template <class T>
@@ -77,7 +80,7 @@ int TreeItem<T>::row() const{
 }
 
 template <class T>
-T TreeItem<T>::data() const{
+const T& TreeItem<T>::data() const{
     return _itemData;
 }
 
@@ -99,6 +102,18 @@ TreeItem<T>* TreeItem<T>::parent(){
 template <class T>
 typename TreeItem<T>::Type TreeItem<T>::type() const{
     return _type;
+}
+
+template<class T>
+bool TreeItem<T>::isExpanded() const
+{
+    return m_isExpanded;
+}
+
+template<class T>
+void TreeItem<T>::setExpanded(bool value)
+{
+    m_isExpanded = value;
 }
 
 #endif // TREEITEM_H
