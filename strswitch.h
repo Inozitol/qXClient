@@ -8,49 +8,200 @@ template <typename Key, typename T> class QHash;
 class QByteArray;
 QT_END_NAMESPACE
 
-#define STRINGS                     \
-    STR(invalid,invalid)            \
-    STR(stream,stream)              \
-    STR(features,features)          \
-    STR(starttls,starttls)          \
-    STR(mechanisms,mechanisms)      \
-    STR(mechanism,mechanism)        \
-    STR(required,required)          \
-    STR(proceed,proceed)            \
-    STR(challenge,challenge)        \
-    STR(success,success)            \
-    STR(bind,bind)                  \
-    STR(iq,iq)                      \
-    STR(message,message)            \
-    STR(presence,presence)          \
-    STR(to,to)                      \
-    STR(from,from)                  \
-    STR(id,id)                      \
-    STR(type,type)                  \
-    STR(lang,lang)                  \
-    STR(result,result)              \
-    STR(error,error)                \
-    STR(show,show)                  \
-    STR(status,status)              \
-    STR(priority,priority)          \
-    STR(body,body)                  \
-    STR(subject,subject)            \
-    STR(thread,thread)              \
-    STR(sm,sm)                      \
-    STR(a,a)                        \
-    STR(r,r)                        \
-    STR(enabled,enabled)            \
-    STR(delay,delay)                \
-    STR(urn:ietf:params:xml:ns:vcard-4.0, ns_xml_vcard40)                           \
-    STR(urn:xmpp:pep-vcard-conversion:0, ns_xmpp_pep_vcard_coversion_0)             \
-    STR(urn:xmpp:push:0, ns_xmpp_push_0)                                            \
-    STR(urn:xmpp:mam:2, ns_xmpp_mam_2)                                              \
-    STR(urn:xmpp:sid:0, ns_xmpp_sid_0)
-
 enum class IntFromString{
-    #define STR(str,en) en,
-    STRINGS
-    #undef STR
+    invalid,
+    stream,
+    features,
+    starttls,
+    mechanisms,
+    mechanism,
+    required,
+    proceed,
+    challenge,
+    success,
+    bind,
+    iq,
+    message,
+    presence,
+    to,
+    from,
+    id,
+    type,
+    lang,
+    result,
+    error,
+    show,
+    status,
+    priority,
+    body,
+    subject,
+    thread,
+    sm,
+    a,
+    r,
+    enabled,
+    delay,
+    ns_xml_vcard40,
+    ns_xml_xmpp_bind,
+    ns_xml_xmpp_e2e,
+    ns_xml_xmpp_sasl,
+    ns_xml_xmpp_sasl_c2s,
+    ns_xml_xmpp_sasl_s2s,
+    ns_xml_xmpp_session,
+    ns_xml_xmpp_stanzas,
+    ns_xml_xmpp_streams,
+    ns_xml_xmpp_tls,
+    ns_xml_xmpp_tls_c2s,
+    ns_xml_xmpp_tls_s2s,
+    ns_xmpp_pep_vcard_conversion_0,
+    ns_xmpp_push_0,
+    ns_xmpp_mam_2,
+    ns_xmpp_sid_0,
+    ns_xmpp_archive_auto,
+    ns_xmpp_archive_manage,
+    ns_xmpp_archive_manual,
+    ns_xmpp_archive_pref,
+    ns_xmpp_avatar_data,
+    ns_xmpp_avatar_metadata,
+    ns_xmpp_delay,
+    ns_xmpp_jingle_apps_rtp_audio,
+    ns_xmpp_jingle_apps_rtp_video,
+    ns_xmpp_ping,
+    ns_xmpp_receipts,
+    ns_xmpp_ssn,
+    ns_xmpp_time,
+    ns_xmpp_styling_0,
+    ns_xmpp_caps,
+    ns_xmpp_caps_optimize,
+    ns_rfc_3264,
+    dnssrv,
+    fullunicode,
+    gc_10,
+    http_jabber_activity,
+    http_jabber_address,
+    http_jabber_amp,
+    http_jabber_amp_errors,
+    http_jabber_amp_action_alert,
+    http_jabber_amp_action_drop,
+    http_jabber_amp_action_error,
+    http_jabber_amp_action_notify,
+    http_jabber_amp_condition_deliver,
+    http_jabber_amp_condition_expire_at,
+    http_jabber_amp_condition_match_resources,
+    http_jabber_bytestreams,
+    http_jabber_bytestreams_udp,
+    http_jabber_caps,
+    http_jabber_caps_optimize,
+    http_jabber_chatstates,
+    http_jabber_commands,
+    http_jabber_compress,
+    http_jabber_disco_info,
+    http_jabber_disco_items,
+    http_jabber_featureneg,
+    http_jabber_geoloc,
+    http_jabber_httpauth,
+    http_jabber_httpbind,
+    http_jabber_ibb,
+    http_jabber_mood,
+    http_jabber_muc,
+    http_jabber_muc_admin,
+    http_jabber_muc_owner,
+    http_jabber_muc_register,
+    http_jabber_muc_roomconfig,
+    http_jabber_muc_roominfo,
+    http_jabber_muc_user,
+    http_jabber_offline,
+    http_jabber_pubsub_access_authorize,
+    http_jabber_pubsub_access_open,
+    http_jabber_pubsub_access_presence,
+    http_jabber_pubsub_access_roster,
+    http_jabber_pubsub_access_whitelist,
+    http_jabber_pubsub_auto_create,
+    http_jabber_pubsub_auto_subscribe,
+    http_jabber_pubsub_collections,
+    http_jabber_pubsub_config_node,
+    http_jabber_pubsub_create_and_configure,
+    http_jabber_pubsub_create_nodes,
+    http_jabber_pubsub_delete_any,
+    http_jabber_pubsub_delete_nodes,
+    http_jabber_pubsub_filtered_notifications,
+    http_jabber_pubsub_get_pending,
+    http_jabber_pubsub_instant_nodes,
+    http_jabber_pubsub_item_ids,
+    http_jabber_pubsub_last_published,
+    http_jabber_pubsub_leased_subscription,
+    http_jabber_pubsub_manage_subscribtion,
+    http_jabber_pubsub_member_affiliation,
+    http_jabber_pubsub_meta_data,
+    http_jabber_pubsub_modify_affiliations,
+    http_jabber_pubsub_multi_collection,
+    http_jabber_pubsub_multi_subscribe,
+    http_jabber_pubsub_outcast_affiliation,
+    http_jabber_pubsub_persistent_items,
+    http_jabber_pubsub_presence_notifications,
+    http_jabber_pubsub_presence_subscribe,
+    http_jabber_pubsub_publish,
+    http_jabber_pubsub_publish_options,
+    http_jabber_pubsub_publisher_affiliation,
+    http_jabber_pubsub_purge_nodes,
+    http_jabber_pubsub_retract_items,
+    http_jabber_pubsub_retrieve_affiliations,
+    http_jabber_pubsub_retrieve_default,
+    http_jabber_pubsub_retrieve_items,
+    http_jabber_pubsub_retrieve_subscriptions,
+    http_jabber_pubsub_subscribe,
+    http_jabber_pubsub_subscribtion_options,
+    http_jabber_pubsub_subscription_notifications,
+    http_jabber_rosterx,
+    http_jabber_sipub,
+    http_jabber_soap,
+    http_jabber_soap_fault,
+    http_jabber_waitinglist,
+    http_jabber_waitinglist_schemes_mailto,
+    http_jabber_waitinglist_scheme_tel,
+    http_jabber_xhtml_im,
+    http_jabber_xdata_layout,
+    http_jabber_xdata_validate,
+    ipv6,
+    jabber_client,
+    jabber_component_accept,
+    jabber_component_connect,
+    jabber_iq_auth,
+    jabber_iq_gateway,
+    jabber_iq_last,
+    jabber_iq_oob,
+    jabber_iq_privacy,
+    jabber_iq_private,
+    jabber_iq_register,
+    jabber_iq_roster,
+    jabber_iq_rpc,
+    jabber_iq_search,
+    jabber_iq_version,
+    jabber_server,
+    jabber_x_data,
+    jabber_x_encrypted,
+    jabber_x_oob,
+    jabber_x_signed,
+    msglog,
+    msgoffline,
+    muc_hidden,
+    muc_membersonly,
+    muc_moderated,
+    muc_nonanonymous,
+    muc_open,
+    muc_passwordprotected,
+    muc_persistent,
+    muc_public,
+    muc_rooms,
+    muc_semianonymous,
+    muc_temporary,
+    muc_unmoderated,
+    muc_unsecured,
+    roster_delimiter,
+    sslc2s,
+    stringprep,
+    xmllang,
+    vcard_temp,
 };
 
 extern const QHash<QByteArray,IntFromString> map_word2int;

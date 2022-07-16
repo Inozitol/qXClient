@@ -3,6 +3,7 @@
 
 #include <QByteArray>
 #include <QDomElement>
+#include "../strswitch.h"
 
 struct discoidentity_t{
     QByteArray category;

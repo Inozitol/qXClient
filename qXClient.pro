@@ -7,6 +7,8 @@ INCLUDEPATH += . \
 
 CONFIG += c++17
 
+QMAKE_CXXFLAGS += -save-temps
+
 include(sasl/sasl.pri)
 include(xmpp/xmpp.pri)
 

@@ -9,6 +9,7 @@ SOURCES += \
 		$$PWD/contact.cpp \
 		$$PWD/contacttreemodel.cpp \
 		$$PWD/creds.cpp \
+		$$PWD/disco.cpp \
 		$$PWD/server.cpp
 
 HEADERS += \
