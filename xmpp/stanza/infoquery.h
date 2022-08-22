@@ -12,6 +12,8 @@ public:
     InfoQuery(QXmlStreamReader& reader);
 
     InfoQuery& operator=(const InfoQuery&)=default;
+
+    QString payloadNS() const;
 };
 
 #endif // INFOQUERY_H

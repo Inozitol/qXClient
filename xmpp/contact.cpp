@@ -6,25 +6,27 @@ Contact::Contact(QObject* parent)
 
 Contact::Contact(const rosteritem_t& roster, QObject* parent)
     : QObject(parent),
-      _roster(roster)
+      m_roster(roster)
       //_chat_chain(new ChatChain(this))
 {}
 
 Contact::Contact(const Contact &contact, QObject* parent)
     : QObject(parent)
 {
-    _roster = contact._roster;
+    m_roster = contact.m_roster;
     _presences = contact._presences;
     m_isOnline = contact.m_isOnline;
+    m_avatarId = contact.m_avatarId;
     //_chat_chain = contact._chat_chain;
 }
 
 Contact::Contact(Contact&& contact, QObject* parent)
     : QObject(parent)
 {
-    _roster = contact._roster;
+    m_roster = contact.m_roster;
     _presences = contact._presences;
     m_isOnline = contact.m_isOnline;
+    m_avatarId = contact.m_avatarId;
     //_chat_chain = contact._chat_chain;
     //contact._chat_chain = nullptr;
 }
@@ -39,10 +41,10 @@ Contact& Contact::operator=(const Contact& contact)
         return *this;
     }
 
-    _roster = contact._roster;
+    m_roster = contact.m_roster;
     _presences = contact._presences;
     m_isOnline = contact.m_isOnline;
-
+    m_avatarId = contact.m_avatarId;
     //delete _chat_chain;
     //std::copy(contact._chat_chain, contact._chat_chain, _chat_chain);
 
@@ -55,7 +57,7 @@ Contact& Contact::operator=(Contact&& contact) noexcept
         return *this;
     }
 
-    _roster = contact._roster;
+    m_roster = contact.m_roster;
     _presences = contact._presences;
     m_isOnline = contact.m_isOnline;
 
@@ -66,7 +68,7 @@ Contact& Contact::operator=(Contact&& contact) noexcept
 }
 
 void Contact::setRoster(const rosteritem_t &roster){
-    _roster = roster;
+    m_roster = roster;
 }
 
 void Contact::insertPresence(const jidfull_t& jid, const Presence& presence){
@@ -106,9 +108,17 @@ Presence Contact::getPresence(const QByteArray& resource) const{
 }
 
 rosteritem_t Contact::getRoster() const{
-    return _roster;
+    return m_roster;
 }
 
 bool Contact::isOnline(){
     return m_isOnline;
+}
+
+void Contact::setAvatarId(const QString &id){
+    m_avatarId = id;
+}
+
+QString Contact::getAvatarId() const{
+    return m_avatarId;
 }

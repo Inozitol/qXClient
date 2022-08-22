@@ -40,6 +40,10 @@ struct jidbare_t{
         return true;
     }
 
+    bool operator!=(const jidbare_t& other) const{
+        return !(*this == other);
+    }
+
     inline bool operator<(const jidbare_t& other) const{
         QByteArray t_str = this->domain + this->local;
         QByteArray o_str = other.domain + other.local;
@@ -101,7 +105,7 @@ struct jidbare_t{
 
     jidbare_t()=default;
 
-    QByteArray toByteArray(){
+    QByteArray toByteArray() const{
         QByteArray arr;
         arr << *this;
         return arr;
@@ -221,7 +225,7 @@ struct jidfull_t : jidbare_t{
 
     jidfull_t()=default;
 
-    QByteArray toByteArray(){
+    QByteArray toByteArray() const{
         QByteArray arr;
         arr << *this;
         return arr;

@@ -34,16 +34,23 @@ void reader2node(QDomDocument& doc, QDomNode& node, QXmlStreamReader& reader){
         throw std::invalid_argument("reader2node expects reader on element start");
     }
 
-    QXmlStreamReader::TokenType token = reader.readNext();
+    QXmlStreamReader::TokenType token = reader.tokenType();
     QString name = reader.name().toString();
     QString ending_str = node.nodeName();
     QDomElement currNode = node.toElement();
 
-    while(name != ending_str){
+    while(!(name == ending_str && token == QXmlStreamReader::EndElement) && token != QXmlStreamReader::Invalid){
+        token = reader.readNext();
+        name = reader.name().toUtf8();
         switch(token){
         case QXmlStreamReader::StartElement:
         {
-            QDomElement newNode = doc.createElement(name);
+            QDomElement newNode;
+            if(reader.namespaceUri().isEmpty()){
+                newNode = doc.createElement(name);
+            }else{
+                newNode = doc.createElementNS(reader.namespaceUri().toString(), name);
+            }
             for(const auto& attr : reader.attributes()){
                 newNode.setAttribute(attr.name().toString(), attr.value().toString());
             }
@@ -56,14 +63,12 @@ void reader2node(QDomDocument& doc, QDomNode& node, QXmlStreamReader& reader){
         case QXmlStreamReader::Characters:
         {
             QDomText textNode = doc.createTextNode(reader.text().toString());
-            currNode.appendChild(textNode).toElement();
+            currNode = currNode.appendChild(textNode).toElement();
         }
             break;
         default:
             break;
         }
-        token = reader.readNext();
-        name = reader.name().toUtf8();
     }
 }
 

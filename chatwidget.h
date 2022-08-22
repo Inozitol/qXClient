@@ -2,7 +2,9 @@
 #define CHATWIDGET_H
 
 #include <QWidget>
+#include <QPixmap>
 
+#include "dataholder.h"
 #include "xmpp/chatchain.h"
 #include "xmpp/contact.h"
 

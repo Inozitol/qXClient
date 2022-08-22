@@ -1,11 +1,15 @@
 #ifndef STREAMFEATURE_H
 #define STREAMFEATURE_H
 
+#include <algorithm>
+
 #include <QSet>
 #include <QString>
+#include <QCryptographicHash>
 
-#include "../../sasl/saslmechanisms.h"
+#include "../disco.h"
 #include "../stanza/infoquery.h"
+#include "../../sasl/saslmechanisms.h"
 
 
 struct Feature{
@@ -15,6 +19,7 @@ struct Feature{
         SASL =          1 << 1,
         RESOURCEBIND =  1 << 2,
         MANAGEMENT =    1 << 3,
+        CAPS =          1 << 4,
     };
 
     friend Type operator|(Type l, Type r);
@@ -85,5 +90,10 @@ struct FeatureManagement : Feature{
     quint32 outbound = 0;
     bool ack_wait = false;
 };
+
+struct FeatureCaps : Feature{
+    FeatureCaps() : Feature(Feature::Type::CAPS){};
+};
+
 
 #endif // STREAMFEATURE_H

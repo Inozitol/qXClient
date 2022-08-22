@@ -1,33 +1,40 @@
 #include "stream.h"
 
 Stream::Stream(const Account& account, const Server& server)
-    : m_uptrAccount(std::make_unique<Account>(account)),
-      m_uptrServer(std::make_unique<Server>(server))
+    : m_sptrAccount(std::make_shared<Account>(account)),
+      m_sptrServer(std::make_shared<Server>(server)),
+      m_disco(m_sptrAccount,m_sptrServer, this),
+      m_pubsub(m_sptrAccount,m_sptrServer, this)
 {
     initSocket();
+    initBuffer();
     initSignals();
-    m_xmlReader.setDevice(m_ptrSocket);
+    m_xmlReader.setDevice(m_ptrBuffer);
 }
 
 Stream::Stream(Account&& account, Server&& server)
-    : m_uptrAccount(std::make_unique<Account>(std::move(account))),
-      m_uptrServer(std::make_unique<Server>(std::move(server)))
+    : m_sptrAccount(std::make_shared<Account>(std::move(account))),
+      m_sptrServer(std::make_shared<Server>(std::move(server))),
+      m_disco(m_sptrAccount,m_sptrServer, this),
+      m_pubsub(m_sptrAccount,m_sptrServer, this)
 {
     initSocket();
+    initBuffer();
     initSignals();
-    m_xmlReader.setDevice(m_ptrSocket);
+    m_xmlReader.setDevice(m_ptrBuffer);
 }
 
 Stream::~Stream(){
     delete(m_ptrSocket);
+    delete(m_ptrBuffer);
     delete(m_ptrContactsModel);
 }
 
 jidbare_t Stream::accountJid(){
-    return m_uptrAccount->jid();
+    return m_sptrAccount->jid();
 }
 
-ContactTreeModel *Stream::contactsModel(){
+ContactTreeModel* Stream::contactsModel(){
     return m_ptrContactsModel;
 }
 
@@ -39,7 +46,7 @@ ChatChain* Stream::chatChain(const jidbare_t& jid){
 }
 
 void Stream::connectInsecure(){
-    m_ptrSocket->connectToHost(m_uptrServer->jid().domain, m_uptrServer->getPort());
+    m_ptrSocket->connectToHost(m_sptrServer->jid().domain, m_sptrServer->getPort());
     m_ptrSocket->write(getHeader() + "\r\n");
 }
 
@@ -48,31 +55,35 @@ void Stream::initSocket(){
 
     m_ptrSocket = new QSslSocket(this);
 
-    connect(m_ptrSocket,  &QSslSocket::stateChanged,
-            this,     &Stream::sslSockStateChange);
+    connect(m_ptrSocket, &QSslSocket::stateChanged,  this, [](QAbstractSocket::SocketState state){ qDebug() << "Socket state change:" << state;});
+    connect(m_ptrSocket, &QSslSocket::readyRead,     this, &Stream::readData);
+    connect(m_ptrSocket, &QSslSocket::errorOccurred, this, &Stream::socketError);
+    connect(m_ptrSocket, &QSslSocket::disconnected,  this, &Stream::initDisconnect);
+    connect(m_ptrSocket, &QSslSocket::encrypted,     this, [](){qDebug() << "SSL Encrypted";});
+    connect(m_ptrSocket, QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors), this, &Stream::sslErrors);
+}
 
-    connect(m_ptrSocket,  &QSslSocket::readyRead,
-            this,     &Stream::readData);
+void Stream::initBuffer(){
+    if(m_ptrBuffer) return;
 
-    connect(m_ptrSocket,  &QSslSocket::errorOccurred,
-            this,     &Stream::socketError);
-
-    connect(m_ptrSocket,  QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors),
-            this,     &Stream::sslErrors);
-
-    connect(m_ptrSocket,  &QSslSocket::disconnected,
-            this,     &Stream::initDisconnect);
-
-    connect(m_ptrSocket,  &QSslSocket::encrypted,
-            this,     [](){qDebug() << "SSL Encrypted";});
+    m_ptrBuffer = new QBuffer(this);
+    m_ptrBuffer->open(QIODevice::ReadWrite);
 }
 
 void Stream::initSignals(){
     connect(this, &Stream::coreEstablished, this, [this](){ m_isCoreEstablished = true; });
-    connect(this, &Stream::coreEstablished, this, [this](){ m_ptrContactsModel = new ContactTreeModel(m_uptrAccount->jid(), this); });
+    connect(this, &Stream::coreEstablished, this, [this](){ m_ptrContactsModel = new ContactTreeModel(m_sptrAccount->jid(), this); });
     connect(this, &Stream::coreEstablished, this, &Stream::queryRoster);
-    connect(this, &Stream::coreEstablished, this, &Stream::queryDisco);
+    connect(this, &Stream::coreEstablished, this, [this](){ m_disco.initQuery(); });
     connect(this, &Stream::coreEstablished, this, [this](){ advertisePresence(true); });
+
+    connect(&m_disco, &Disco::sendInfoQuery, this, &Stream::sendStanza);
+    connect(&m_disco, &Disco::gotFeature,    this, &Stream::implementDiscoFeature);
+
+    connect(&m_disco, &Disco::pubsubNodeDiscovered, &m_pubsub, &PubSub::pubsubNodeDiscovered);
+
+    connect(&m_pubsub, &PubSub::sendInfoQuery, this, &Stream::sendStanza);
+    connect(&m_pubsub, &PubSub::avatarUpdated, this, &Stream::updateAvatar);
 }
 
 void Stream::reconnectSecure(){
@@ -80,8 +91,59 @@ void Stream::reconnectSecure(){
     m_ptrSocket->write(getHeader() + "\r\n");
 }
 
-void Stream::sslSockStateChange(QAbstractSocket::SocketState state){
-    qDebug() << "State change:" << state;
+void Stream::processData(){
+    QFlags<ReaderTrigger> triggers;
+
+    while(!m_xmlReader.atEnd()){
+        QXmlStreamReader::TokenType token = m_xmlReader.readNext();
+        QByteArray name = m_xmlReader.name().toUtf8();
+        if(token == QXmlStreamReader::Invalid){
+            qDebug() << "XML reader error token type ["
+                     << m_xmlReader.error()
+                     << "] reads ["
+                     << m_xmlReader.errorString()
+                     << "]";
+
+            token = m_xmlReader.readNext();
+            name = m_xmlReader.name().toUtf8();
+        }
+        switch(m_xmlReaderState){
+
+        case ReaderState::INIT:
+            stateINIT(token,name,triggers);
+            break;
+        case ReaderState::STREAM:
+            stateSTREAM(token,name,triggers);
+            break;
+        case ReaderState::FEATURES:
+            stateFEATURES(token,name,triggers);
+            break;
+        case ReaderState::STARTTLS:
+            stateSTARTTLS(token,name,triggers);
+            break;
+        case ReaderState::SASL:
+            stateSASL(token,name,triggers);
+            break;
+        case ReaderState::RESOURCEBIND:
+            stateRESOURCEBIND(token,name,triggers);
+            break;
+        }
+        qDebug() << "XML reader token type ["
+                 << token
+                 << "] | text ["
+                 << m_xmlReader.text()
+                 << "] | name ["
+                 << name
+                 << "] | namespace ["
+                 << m_xmlReader.namespaceUri()
+                 << "]";
+    }
+    if(triggers.testFlag(ReaderTrigger::FEATURE)){
+        processFeatures();
+    }
+    if(triggers.testFlag(ReaderTrigger::INFOQUERY)){
+        processInfoQuery();
+    }
 }
 
 void Stream::stateINIT(QXmlStreamReader::TokenType& token, QByteArray& name, QFlags<ReaderTrigger>&){
@@ -111,23 +173,49 @@ void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, Q
         case IntFromString::iq:
         {
             InfoQuery iq = InfoQuery(m_xmlReader);
+            if(iq.getFrom().isEmpty()){
+                iq.setFrom(m_sptrServer->jid().bare().toByteArray());
+            }
             token = m_xmlReader.tokenType();
             name = m_xmlReader.name().toUtf8();
-            qDebug() << "Received";
-            qDebug() << "IQ:" << iq.str();
 
-            QByteArray id = iq.getID();
+            qInfo() << "Received stanza IQ | from ["
+                    << iq.getFrom()
+                    << "] | ID ["
+                    << iq.getID()
+                    << "] | NS ["
+                    << iq.payloadNS().toUtf8()
+                    << "]";
 
-            switch(m_umapIQWaiting.at(id)){
-            case IQPurpose::FEATURE:
+            qDebug() << "Received stanza IQ |"
+                     << iq.str();
+
+            QByteArray ns = iq.payloadNS().toUtf8();
+
+            switch(word2int(ns)){
+            case IntFromString::ns_xml_xmpp_bind:
                 trigger |= ReaderTrigger::FEATURE;
                 break;
-            case IQPurpose::ROSTER:
-            case IQPurpose::DISCO:
+
+            case IntFromString::jabber_iq_roster:
+            case IntFromString::http_jabber_disco_info:
+            case IntFromString::http_jabber_disco_items:
+            case IntFromString::http_jabber_pubsub:
                 trigger |= ReaderTrigger::INFOQUERY;
+            default:
                 break;
             }
-            m_umapIQResults.insert(std::make_pair(std::move(id), std::move(iq)));
+
+            jidfull_t fromJid = iq.getFrom();
+            QByteArray id = iq.getID();
+
+            if(m_umapIQResults.count(fromJid)){
+                m_umapIQResults.at(fromJid).insert({std::move(id),std::move(iq)});
+            }else{
+                std::unordered_map<QByteArray, InfoQuery> tmpMap;
+                tmpMap.insert({std::move(id),std::move(iq)});
+                m_umapIQResults.insert({std::move(fromJid),std::move(tmpMap)});
+            }
 
             if(m_flgActiveFeatures & Feature::Type::MANAGEMENT){
                 auto ft_manag = std::static_pointer_cast<FeatureManagement>(m_umapPersistentFeatures.at(Feature::Type::MANAGEMENT));
@@ -138,7 +226,15 @@ void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, Q
         case IntFromString::presence:
         {
             Presence presence(m_xmlReader);
-            qDebug() << "Presence:" << presence.str();
+            qInfo() << "Received stanza Presence | from ["
+                    << presence.getFrom()
+                    << "] | ID ["
+                    << presence.getID()
+                    << "]";
+
+            qDebug() << "Received stanza Presence |"
+                     << presence.str();
+
             jidfull_t jid = presence.getFrom();
             if(!m_umapChatChains.count(jid)){
                 ChatChain* chain = new ChatChain(this, jid, this);
@@ -153,6 +249,9 @@ void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, Q
             }else{
                 m_ptrContactsModel->removePresence(presence);
             }
+            if(jid.bare() != m_sptrAccount->jid().bare()){
+                m_disco.queryPresence(presence);
+            }
 
             if(m_flgActiveFeatures & Feature::Type::MANAGEMENT){
                 auto ft_manag = std::static_pointer_cast<FeatureManagement>(m_umapPersistentFeatures.at(Feature::Type::MANAGEMENT));
@@ -163,18 +262,52 @@ void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, Q
         case IntFromString::message:
         {
             Message message(m_xmlReader);
-            qDebug() << "Message from:" << message.getFrom() << "reads" << message.getBody();
-            qDebug() << message.str();
-            jidfull_t jid = message.getFrom();
-            if(!m_umapChatChains.count(jid)){
-                ChatChain* chain = new ChatChain(this, jid, this);
-                connect(chain, &ChatChain::receivedMessage,
-                        this, &Stream::receivedMessage);
-                connect(chain, &ChatChain::sendMessage,
-                        this, &Stream::sendStanza);
-                m_umapChatChains.insert({jid, chain});
+            qInfo() << "Received stanza Message | from ["
+                    << message.getFrom()
+                    << "] | ID ["
+                    << message.getID()
+                    << "] | Type ["
+                    << message.getType()
+                    << "]";
+
+            qDebug() << "Received stanza Message |"
+                     << message.str();
+
+            switch(word2int(message.getType())){
+                case IntFromString::chat:
+                {
+                    jidfull_t jid = message.getFrom();
+                    if(!m_umapChatChains.count(jid)){
+                        ChatChain* chain = new ChatChain(this, jid, this);
+                        connect(chain, &ChatChain::receivedMessage,
+                                this, &Stream::receivedMessage);
+                        connect(chain, &ChatChain::sendMessage,
+                                this, &Stream::sendStanza);
+                        m_umapChatChains.insert({jid, chain});
+                    }
+                    m_umapChatChains.at(jid)->addMessage(std::move(message));
+                }
+                break;
+                case IntFromString::headline:
+                {
+                QByteArray ns = message.payloadNS().toUtf8();
+                switch(word2int(ns)){
+                    case IntFromString::http_jabber_pubsub_event:
+                    {
+                        m_pubsub.processEventMessage(message);
+                    }
+                    break;
+
+                default:
+                    break;
+                }
+
+                }
+                break;
+            default:
+                break;
             }
-            m_umapChatChains.at(jid)->addMessage(std::move(message));
+
 
             if(m_flgActiveFeatures & Feature::Type::MANAGEMENT){
                 auto ft_manag = std::static_pointer_cast<FeatureManagement>(m_umapPersistentFeatures.at(Feature::Type::MANAGEMENT));
@@ -212,7 +345,7 @@ void Stream::stateSTREAM(QXmlStreamReader::TokenType& token, QByteArray& name, Q
     case QXmlStreamReader::EndElement:
         switch(word2int(name)){
         case IntFromString::stream:
-                finishDisconnect();
+            finishDisconnect();
             break;
         default:
             break;
@@ -247,6 +380,10 @@ void Stream::stateFEATURES(QXmlStreamReader::TokenType& token, QByteArray& name,
                 m_umapEpheralFeatures.insert({Feature::Type::MANAGEMENT, std::make_shared<FeatureManagement>()});
                 trigger |= ReaderTrigger::FEATURE;
             }
+            break;
+        case IntFromString::c:
+            m_umapEpheralFeatures.insert({Feature::Type::CAPS, std::make_shared<FeatureCaps>()});
+            trigger |= ReaderTrigger::FEATURE;
             break;
         default:
             break;
@@ -377,45 +514,33 @@ void Stream::stateRESOURCEBIND(QXmlStreamReader::TokenType& token, QByteArray& n
 }
 
 void Stream::readData(){
-    QFlags<ReaderTrigger> triggers;
-
-    while(!m_xmlReader.atEnd()){
-        QXmlStreamReader::TokenType token = m_xmlReader.readNext();
-        QByteArray name = m_xmlReader.name().toUtf8();
-        if(token == QXmlStreamReader::Invalid){
-            qDebug() << "ERROR: " << m_xmlReader.error() << m_xmlReader.errorString();
-            token = m_xmlReader.readNext();
-            name = m_xmlReader.name().toUtf8();
-        }
-        switch(m_xmlReaderState){
-
-        case ReaderState::INIT:
-            stateINIT(token,name,triggers);
-            break;
-        case ReaderState::STREAM:
-            stateSTREAM(token,name,triggers);
-            break;
-        case ReaderState::FEATURES:
-            stateFEATURES(token,name,triggers);
-            break;
-        case ReaderState::STARTTLS:
-            stateSTARTTLS(token,name,triggers);
-            break;
-        case ReaderState::SASL:
-            stateSASL(token,name,triggers);
-            break;
-        case ReaderState::RESOURCEBIND:
-            stateRESOURCEBIND(token,name,triggers);
-            break;
-        }
-        qDebug() << "TOKEN: " << token << m_xmlReader.text() << name << m_xmlReader.namespaceUri();
+    static bool waiting;    // default false
+    static QByteArray dataBuffer;
+    qint64 dataSize = 0;
+    QDomDocument testingDoc;
+    if(!waiting){
+        m_ptrBuffer->buffer().clear();
     }
-    if(triggers.testFlag(ReaderTrigger::FEATURE)){
-        processFeatures();
+    m_ptrBuffer->seek(0);
+    while(m_ptrSocket->bytesAvailable() > 0){
+        QByteArray tmpData = m_ptrSocket->readAll();
+        dataBuffer.append(tmpData);
     }
-    if(triggers.testFlag(ReaderTrigger::INFOQUERY)){
-        processInfoQuery();
+    dataSize = dataBuffer.length();
+    QByteArray testingData = "<?xml version='1.0'?><doc>" + dataBuffer + "</doc>";
+    bool parsed = testingDoc.setContent(testingData);
+    // This is wrong on multiple levels
+    // Will fix this later after figuring out what the hell is happening here
+    if((!parsed && dataSize == 4096) || (dataBuffer.front() != '<' || dataBuffer.back() != '>')){
+        waiting = true;
+        return;
     }
+    qDebug() << dataBuffer;
+    m_ptrBuffer->write(dataBuffer);
+    dataBuffer.clear();
+    waiting = false;
+    m_ptrBuffer->seek(0);
+    processData();
 }
 
 void Stream::processFeatures(){
@@ -425,7 +550,7 @@ void Stream::processFeatures(){
         switch(it->first){
         case Feature::Type::STARTTLS:
         {
-            qDebug() << "Feature STARTTLS | Required: " << it->second->required;
+            qDebug() << "Processing feature STARTTLS | Required:" << it->second->required;
             auto ft_starttls = std::static_pointer_cast<FeatureSTARTTLS>(it->second);
             switch(ft_starttls->state){
             case FeatureSTARTTLS::State::ASK:
@@ -434,7 +559,7 @@ void Stream::processFeatures(){
                 break;
             case FeatureSTARTTLS::State::PROCEED:
                 m_xmlReader.clear();
-                m_xmlReader.setDevice(m_ptrSocket);
+                m_xmlReader.setDevice(m_ptrBuffer);
                 reconnectSecure();
                 m_flgActiveFeatures |= Feature::Type::STARTTLS;
                 erase_feature  = true;
@@ -448,19 +573,35 @@ void Stream::processFeatures(){
             break;
         case Feature::Type::SASL:
         {
-            qDebug() << "Feature SASL | Required: " << it->second->required;
+            qDebug() << "Processing feature SASL | Required:" << it->second->required;
             auto ft_sasl = std::static_pointer_cast<FeatureSASL>(it->second);
             switch(ft_sasl->state){
             case FeatureSASL::State::AUTH:
                 for(const auto& sasl : m_qvecSASL){
                     if(ft_sasl->srv_mechanisms.contains(SASL2StrMapper.value(sasl))){
                         ft_sasl->mechanism = sasl;
-                        m_SCRAMGenerator = std::make_shared<SASL::SCRAMGenerator>(sasl, m_uptrAccount->credentials());
-                        m_SCRAMGenerator->setSCRAMFlag(SASL::SCRAMGenerator::CHANNEL_FLAG::N);
-                        m_SCRAMGenerator->writeAttribute(SASL::SCRAMGenerator::Attributes::NAME, m_uptrAccount->jid().local);
-                        m_SCRAMGenerator->writeAttribute(SASL::SCRAMGenerator::Attributes::NONCE_CLIENT, Utils::randomString(NONCE_INIT_LEN));
-                        m_ptrSocket->write(getAuth() + "\r\n");
-                        m_xmlReaderState = ReaderState::SASL;
+                        switch(sasl){
+                        case SASLSupported::SCRAM_SHA_1:
+                        {
+                            m_SASLGenerator = std::make_shared<SASL::SCRAMGenerator>(sasl, m_sptrAccount->credentials());
+                            auto SCRAMGenerator = std::static_pointer_cast<SASL::SCRAMGenerator>(m_SASLGenerator);
+                            SCRAMGenerator->setSCRAMFlag(SASL::SCRAMGenerator::CHANNEL_FLAG::N);
+                            SCRAMGenerator->writeAttribute(SASL::SCRAMGenerator::Attributes::NAME, m_sptrAccount->jid().local);
+                            SCRAMGenerator->writeAttribute(SASL::SCRAMGenerator::Attributes::NONCE_CLIENT, Utils::randomString(NONCE_INIT_LEN));
+                            m_ptrSocket->write(getAuth() + "\r\n");
+                            m_xmlReaderState = ReaderState::SASL;
+                        }
+                            break;
+                        case SASLSupported::PLAIN:
+                        {
+                            m_SASLGenerator = std::make_shared<SASL::PLAINGenerator>(sasl, m_sptrAccount->credentials());
+                            auto PLAINGenerator = std::static_pointer_cast<SASL::PLAINGenerator>(m_SASLGenerator);
+                            PLAINGenerator->writeID(m_sptrAccount->jid().local);
+                            m_ptrSocket->write(getAuth() + "\r\n");
+                            m_xmlReaderState = ReaderState::SASL;
+                        }
+                            break;
+                        }
                         break;
                     }
                 }
@@ -468,19 +609,29 @@ void Stream::processFeatures(){
                 break;
             case FeatureSASL::State::CHALLENGE:
             {
-                m_SCRAMGenerator->loadChallenge(ft_sasl->challenge);
+                m_SASLGenerator->loadChallenge(ft_sasl->challenge);
                 m_ptrSocket->write(getResponse() + "\r\n");
                 m_xmlReaderState = ReaderState::SASL;
             }
                 break;
             case FeatureSASL::State::SUCCESS:
             {
-                if(!m_SCRAMGenerator->isServerSigValid(ft_sasl->server_sig)){
-                    qDebug() << "Invalid server signature";
-                    // TODO invalid server signature
+                auto ft_sasl = std::static_pointer_cast<FeatureSASL>(it->second);
+                switch(ft_sasl->mechanism){
+                case SASLSupported::SCRAM_SHA_1:
+                {
+                    std::shared_ptr<SASL::SCRAMGenerator> SCRAMGenerator = std::static_pointer_cast<SASL::SCRAMGenerator>(m_SASLGenerator);
+                    if(!SCRAMGenerator->isServerSigValid(ft_sasl->server_sig)){
+                        qDebug() << "Invalid server signature";
+                        // TODO invalid server signature
+                    }
+                }
+                    break;
+                case SASLSupported::PLAIN:
+                    break;
                 }
                 m_xmlReader.clear();
-                m_xmlReader.setDevice(m_ptrSocket);
+                m_xmlReader.setDevice(m_ptrBuffer);
                 m_ptrSocket->write(getHeader() + "\r\n");
                 m_flgActiveFeatures |= Feature::Type::SASL;
                 erase_feature  = true;
@@ -493,7 +644,7 @@ void Stream::processFeatures(){
             break;
         case Feature::Type::RESOURCEBIND:
         {
-            qDebug() << "Feature RESOURCEBIND | Required: " << it->second->required;
+            qDebug() << "Processing feature RESOURCEBIND | Required:" << it->second->required;
             auto ft_bind = std::static_pointer_cast<FeatureBind>(it->second);
             if(ft_bind->query_id.isEmpty()){
                 InfoQuery iq = InfoQuery();
@@ -502,18 +653,14 @@ void Stream::processFeatures(){
 
                 QByteArray id = iq.getID();
                 ft_bind->query_id = id;
-                m_umapIQWaiting.insert({id, IQPurpose::FEATURE});
 
-                QDomElement bind = iq.createElement("bind");
-                bind.setAttribute("xmlns", "urn:ietf:params:xml:ns:xmpp-bind");
+                QDomElement bind = iq.createElementNS("urn:ietf:params:xml:ns:xmpp-bind","bind");
 
                 iq.insertNode(bind);
 
                 sendStanza(iq);
             }else{
-                InfoQuery iq_result = m_umapIQResults.at(ft_bind->query_id);
-                m_umapIQWaiting.erase(m_umapIQWaiting.find(ft_bind->query_id));
-                m_umapIQResults.erase(m_umapIQResults.find(ft_bind->query_id));
+                InfoQuery iq_result = m_umapIQResults.at(m_sptrServer->jid().domain).at(ft_bind->query_id);
 
                 switch(word2int(iq_result.getType())){
                 case IntFromString::result:
@@ -522,7 +669,7 @@ void Stream::processFeatures(){
                     QDomElement jid_elem = bind_node.firstChildElement();
 
                     jidfull_t jid = jid_elem.text().toUtf8();
-                    m_uptrAccount->setJid(jid);
+                    m_sptrAccount->setJid(jid);
                     m_flgActiveFeatures |= Feature::Type::RESOURCEBIND;
                     erase_feature = true;
                     emit coreEstablished();
@@ -534,6 +681,10 @@ void Stream::processFeatures(){
                 default:
                     break;
                 }
+                m_umapIQResults.at(m_sptrServer->jid().domain).erase(ft_bind->query_id);
+                if(m_umapIQResults.at(m_sptrServer->jid().domain).empty()){
+                    m_umapIQResults.erase(m_sptrServer->jid().domain);
+                }
             }
         }
             break;
@@ -542,7 +693,7 @@ void Stream::processFeatures(){
                 break;
             }
         {
-            qDebug() << "Feature STREAM MANAGEMENT | Required: " << it->second->required;
+            qDebug() << "Processing feature STREAM MANAGEMENT | Required:" << it->second->required;
             auto ft_manag = std::static_pointer_cast<FeatureManagement>(it->second);
             switch(ft_manag->state){
             case FeatureManagement::State::ASK:
@@ -550,7 +701,7 @@ void Stream::processFeatures(){
                 QByteArray enable = getManagementEnable();
                 m_ptrSocket->write(enable + "\r\n");
             }
-            break;
+                break;
             case FeatureManagement::State::ENABLED:
             {
                 m_umapPersistentFeatures.insert({Feature::Type::MANAGEMENT, ft_manag});
@@ -561,8 +712,24 @@ void Stream::processFeatures(){
             }
         }
             break;
+        case Feature::Type::CAPS:
+            if(!(m_flgActiveFeatures & Feature::Type::RESOURCEBIND)){
+                break;
+            }
+
+        {
+            qDebug() << "Processing feature CAPS | Required:" << it->second->required;
+            auto ft_caps = std::static_pointer_cast<FeatureCaps>(it->second);
+            m_umapPersistentFeatures.insert({Feature::Type::CAPS, ft_caps});
+            m_flgActiveFeatures |= Feature::Type::CAPS;
+            erase_feature = true;
+
+            // TODO Make a check if the stream got its presence advertised or not
+            //advertisePresence(true);
+        }
+            break;
         case Feature::Type::UNKNOWN:
-            qDebug() << "Feature UNKNOWN | Required: " << it->second->required;
+            qDebug() << "Got unknown/unsupported feature | Required:" << it->second->required;
 
             break;
         }
@@ -575,81 +742,64 @@ void Stream::processFeatures(){
 }
 
 void Stream::processInfoQuery(){
-    auto it = m_umapIQResults.cbegin();
-    while(it != m_umapIQResults.cend()){
-        QByteArray id = it->first;
-        InfoQuery iq = it->second;
-        IQPurpose purpose = m_umapIQWaiting.at(id);
+    // Load maps identified by jid
+    auto it_jidmap = m_umapIQResults.begin();
+    while(it_jidmap != m_umapIQResults.end()){
 
-        switch(purpose){
-        case IQPurpose::ROSTER:
-        {
-            QDomNode query_node = iq.root().firstChild();
-            QDomNodeList item_list = query_node.childNodes();
-            for(int i=0; i<item_list.length(); i++){
-                QDomElement curr_item = item_list.at(i).toElement();
-                rosteritem_t roster(curr_item);
-                m_ptrContactsModel->setRoster(roster);
-                if(!m_umapChatChains.count(roster.jid)){
-                    ChatChain* chain = new ChatChain(this, roster.jid, this);
-                    connect(chain, &ChatChain::receivedMessage,
-                            this, &Stream::receivedMessage);
-                    connect(chain, &ChatChain::sendMessage,
-                            this, &Stream::sendStanza);
-                    m_umapChatChains.insert({roster.jid, chain});
+        // Load maps identified by id
+        auto it_idmap = it_jidmap->second.cbegin();
+        while(it_idmap != it_jidmap->second.cend()){
+
+            InfoQuery iq = it_idmap->second;
+            QByteArray ns = iq.payloadNS().toUtf8();
+
+            // Switch by namespace of payload
+            switch(word2int(ns)){
+            case IntFromString::jabber_iq_roster:
+            {
+                QDomNode query_node = iq.root().firstChild();
+                QDomNodeList item_list = query_node.childNodes();
+                for(int i=0; i<item_list.length(); i++){
+                    QDomElement curr_item = item_list.at(i).toElement();
+                    rosteritem_t roster(curr_item);
+                    m_ptrContactsModel->setRoster(roster);
+                    if(!m_umapChatChains.count(roster.jid)){
+                        ChatChain* chain = new ChatChain(this, roster.jid, this);
+                        connect(chain, &ChatChain::receivedMessage,
+                                this, &Stream::receivedMessage);
+                        connect(chain, &ChatChain::sendMessage,
+                                this, &Stream::sendStanza);
+                        m_umapChatChains.insert({roster.jid, chain});
+                    }
                 }
             }
-        }
-            break;
-        case IQPurpose::DISCO:
-        {
-            QDomNode query_node = iq.root().firstChild();
-            QDomNodeList item_list = query_node.childNodes();
-            for(int i=0; i<item_list.length(); i++){
-                QDomElement curr_item = item_list.at(i).toElement();
-                if(curr_item.nodeName() == "identity"){
-                    discoidentity_t identity(curr_item);
-                }
-                if(curr_item.nodeName() == "feature"){
-                    discofeature_t feature(curr_item);
-                }
+                break;
+            case IntFromString::http_jabber_disco_info:
+            case IntFromString::http_jabber_disco_items:
+                m_disco.processQuery(iq);
+                break;
+            case IntFromString::http_jabber_pubsub:
+                m_pubsub.processInfoQuery(iq);
+                break;
+            default:
+                break;
             }
+
+            // Erase after processing
+            it_idmap = it_jidmap->second.erase(it_idmap);
         }
-            break;
-        default:
-            break;
-        }
-        m_umapIQWaiting.erase(m_umapIQWaiting.find(id));
-        it = m_umapIQResults.erase(it);
+        // Erase after processing
+        it_jidmap = m_umapIQResults.erase(it_jidmap);
     }
 }
 
 void Stream::queryRoster(){
     InfoQuery iq;
-    iq.setFrom(m_uptrAccount->jid().toByteArray());
+    iq.setFrom(m_sptrAccount->jid().toByteArray());
     iq.generateID();
     iq.setType("get");
 
-    m_umapIQWaiting.insert({iq.getID(), IQPurpose::ROSTER});
-
-    QDomElement query = iq.createElement("query");
-    query.setAttribute("xmlns", "jabber:iq:roster");
-
-    iq.insertNode(query);
-
-    sendStanza(iq);
-}
-
-void Stream::queryDisco(){
-    InfoQuery iq;
-    iq.setFrom(m_uptrAccount->jid().toByteArray());
-    iq.generateID();
-    iq.setType("get");
-
-    m_umapIQWaiting.insert({iq.getID(), IQPurpose::DISCO});
-
-    QDomElement query = iq.createElement("query");
-    query.setAttribute("xmlns", "http://jabber.org/protocol/disco#info");
+    QDomElement query = iq.createElementNS("jabber:iq:roster","query");
 
     iq.insertNode(query);
 
@@ -661,6 +811,19 @@ void Stream::advertisePresence(bool status){
     if(!status){
         presence.setType("unavailable");
     }
+    auto ft_caps = std::static_pointer_cast<FeatureCaps>(m_umapEpheralFeatures.at(Feature::Type::CAPS));
+    QDomElement c = presence.createElementNS("http://jabber.org/protocol/caps","c");
+    switch(caps_data::hashAlgo){
+    case QCryptographicHash::Sha1:
+        c.setAttribute("hash", "sha-1");
+        break;
+    default:
+        break;
+    }
+    c.setAttribute("node",caps_data::node);
+    c.setAttribute("ver",caps_data::getVerString().toBase64());
+    presence.insertNode(c);
+
     sendStanza(presence);
 }
 
@@ -677,29 +840,64 @@ void Stream::finishDisconnect(){
     emit disconnected();
 }
 
+void Stream::implementDiscoFeature(const jidfull_t &jid, Disco::Feature feature){
+    switch(feature){
+    case Disco::Feature::avatar_metadata_notify:
+        //m_pubsub.subscribe(jid, "urn:xmpp:avatar:metadata");
+        break;
+    default:
+        break;
+    }
+
+}
+
+void Stream::updateAvatar(const jidfull_t &jid, const QString &id){
+    m_ptrContactsModel->updateAvatarId(jid, id);
+}
+
 void Stream::sendStanza(const Stanza& stanza){
-    qDebug() << "Sending";
+
     switch(stanza.type()){
     case Stanza::Type::INFOQUERY:
     {
         auto iq = static_cast<const InfoQuery*>(&stanza);
-        qDebug() << "IQ to:" << iq->getTo() << "from" << iq->getFrom();
+        qInfo() << "Sending stanza IQ | from ["
+                << iq->getFrom()
+                << "] | ID ["
+                << iq->getID()
+                << "]";
+
+        qDebug() << "Sending stanza IQ |"
+                 << stanza.str();
     }
         break;
     case Stanza::Type::PRESENCE:
     {
         auto presence = static_cast<const Presence*>(&stanza);
-        qDebug() << "Presence to:" << presence->getTo() << "from" << presence->getFrom();
+        qInfo() << "Sending stanza Presence | from ["
+                << presence->getFrom()
+                << "] | ID ["
+                << presence->getID()
+                << "]";
+
+        qDebug() << "Sending stanza Presence |"
+                 << stanza.str();
     }
         break;
     case Stanza::Type::MESSAGE:
     {
         auto msg = static_cast<const Message*>(&stanza);
-        qDebug() << "Message to:" << msg->getTo() << "reads" << msg->getBody();
+        qInfo() << "Sending stanza Message | from ["
+                << msg->getFrom()
+                << "] | ID ["
+                << msg->getID()
+                << "]";
+
+        qDebug() << "Sending stanza Message |"
+                 << stanza.str();
     }
         break;
     }
-    qDebug() << stanza.str();
     m_ptrSocket->write(stanza.str() + "\r\n");
 
     if(m_flgActiveFeatures & Feature::Type::MANAGEMENT){
@@ -724,8 +922,8 @@ QByteArray Stream::getHeader(){
     QXmlStreamWriter writer(&arr);
     writer.writeStartDocument();
     writer.writeStartElement("stream:stream");
-    writer.writeAttribute("from",     m_uptrAccount->jid().toByteArray());
-    writer.writeAttribute("to",       m_uptrServer->jid().domain);
+    writer.writeAttribute("from",     m_sptrAccount->jid().toByteArray());
+    writer.writeAttribute("to",       m_sptrServer->jid().domain);
     writer.writeAttribute("version",  "1.0");
     writer.writeAttribute("xml:lang", "en");
     writer.writeAttribute("xmlns",    "jabber:client");
@@ -762,8 +960,8 @@ QByteArray Stream::getAuth(){
     QXmlStreamWriter writer(&arr);
     writer.writeStartElement("auth");
     writer.writeAttribute("xmlns", "urn:ietf:params:xml:ns:xmpp-sasl");
-    writer.writeAttribute("mechanism", SASL2StrMapper.value(m_SCRAMGenerator->GetSASL()));
-    writer.writeCharacters(m_SCRAMGenerator->getInitResponse().toBase64());
+    writer.writeAttribute("mechanism", SASL2StrMapper.value(m_SASLGenerator->GetSASL()));
+    writer.writeCharacters(m_SASLGenerator->getInitResponse().toBase64());
     writer.writeEndElement();
     return arr;
 }
@@ -773,10 +971,11 @@ QByteArray Stream::getResponse(){
     QXmlStreamWriter writer(&arr);
     writer.writeStartElement("response");
     writer.writeAttribute("xmlns", "urn:ietf:params:xml:ns:xmpp-sasl");
-    writer.writeCharacters(m_SCRAMGenerator->getChallengeResponse().toBase64());
+    writer.writeCharacters(m_SASLGenerator->getChallengeResponse().toBase64());
     writer.writeEndElement();
     return arr;
 }
+
 QByteArray Stream::getPresence(bool status){
     QByteArray arr;
     QXmlStreamWriter writer(&arr);

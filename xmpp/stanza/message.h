@@ -33,6 +33,7 @@ public:
 
     void setFlag(Flag flgs);
     bool isDelayed();
+    QString payloadNS() const;
 
     static const unsigned int THREAD_LEN = 10;
 private:

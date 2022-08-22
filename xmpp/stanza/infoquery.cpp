@@ -45,5 +45,8 @@ InfoQuery::InfoQuery(QXmlStreamReader& reader)
     }
 
     Utils::reader2node(*this, _stanza, reader);
+}
 
+QString InfoQuery::payloadNS() const{
+    return _stanza.firstChildElement().namespaceURI();
 }

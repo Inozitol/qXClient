@@ -1,7 +1,7 @@
 #include "contacttreemodel.h"
 
 ContactTreeModel::ContactTreeModel(jidfull_t selfJid, QObject *parent)
-    : QAbstractItemModel{parent}, _selfJid(selfJid)
+    : QAbstractItemModel(parent), _selfJid(selfJid)
 {
     _rootItem = new ContactItem(ContactItem::Type::ROOT, Contact());
     _selfItem = new ContactItem(ContactItem::Type::DATA, Contact(), _rootItem);
@@ -193,6 +193,16 @@ void ContactTreeModel::removePresence(const Presence &presence){
     }
     ContactItem* item = static_cast<ContactItem*>(index.internalPointer());
     item->dataPtr()->removePresence(jidfull_t(presence.getFrom()));
+    emit dataChanged(index, index);
+}
+
+void ContactTreeModel::updateAvatarId(const jidfull_t &jid, const QString &id){
+    QModelIndex index = indexByJid(jid);
+    if(!index.isValid()){
+        return;
+    }
+    ContactItem* item = static_cast<ContactItem*>(index.internalPointer());
+    item->dataPtr()->setAvatarId(id);
     emit dataChanged(index, index);
 }
 

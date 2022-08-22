@@ -32,16 +32,19 @@ public:
     Presence getPresence(const QByteArray& resource) const;
     rosteritem_t getRoster() const;
     bool isOnline();
+    void setAvatarId(const QString& id);
+    QString getAvatarId() const;
     //ChatChain* getChatChain();
 
     //void insertMessage(const Message& message);
     //void insertMessage(Message&& message);
 
 private:
-    rosteritem_t _roster{};
+    rosteritem_t m_roster{};
     QHash<QByteArray, Presence> _presences;
     //ChatChain* _chat_chain = nullptr;
     bool m_isOnline = false;
+    QString m_avatarId;
 
 signals:
     void newMessage(const Message& msg);

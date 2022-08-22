@@ -50,6 +50,9 @@ Message::Message(QXmlStreamReader& reader)
             break;
         }
     }
+    if(getType().isEmpty()){
+        setType("normal");
+    }
 
     Utils::reader2node(*this, _stanza, reader);
 
@@ -200,4 +203,8 @@ void Message::setFlag(Flag flgs){
 
 bool Message::isDelayed(){
     return m_flgFlags.testFlag(Flag::DELAYED);
+}
+
+QString Message::payloadNS() const{
+    return _stanza.firstChildElement().namespaceURI();
 }

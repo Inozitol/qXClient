@@ -11,10 +11,12 @@
 #include <QSslConfiguration>
 #include <QMap>
 #include <QSet>
+#include <QSslKey>
 
 #include "utils.h"
 #include "streamfeature.h"
 #include "../disco.h"
+#include "../pubsub.h"
 #include "../creds.h"
 #include "../contact.h"
 #include "../account.h"
@@ -27,6 +29,7 @@
 #include "../../strswitch.h"
 #include "../../sasl/saslmechanisms.h"
 #include "../../sasl/scramgenerator.h"
+#include "../../sasl/plaingenerator.h"
 
 /** @brief Handles most of the semantics behind negotiations and IO.
  *
@@ -104,23 +107,31 @@ private:
      *
      * FEATURE - Some feature expects this IQ, so we should call processFeatures()
      * ROSTER - A roster processor expects this IQ, which is handled by processInfoQuery()
-     * DISCO - Service discovery probably sended result, which is handled by processInfoQuery()
+     * DISCO_INFO - Service discovery returned result for disco#info, which is handled by processInfoQuery()
+     * DISCO_ITEMS - Service discovery returned result for disco#items, which is handled by processInfoQuery()
      *
      */
     enum class IQPurpose{
         FEATURE,
         ROSTER,
-        DISCO
+        DISCO_INFO,
+        DISCO_ITEMS
     };
 
     /* Initializes SSL socket */
     void initSocket();
+
+    /* Initializes data buffer */
+    void initBuffer();
 
     /* Initializes signals to be called when core is established */
     void initSignals();
 
     /* Promotes the socket to use TLS encryption */
     void reconnectSecure();
+
+    /* Processes received data */
+    void processData();
 
     /* Handles logic behind features */
     void processFeatures();
@@ -236,8 +247,9 @@ private:
     inline QByteArray getManagementAck(quint32 count);
 
     QSslSocket*                 m_ptrSocket = nullptr;
-    std::unique_ptr<Account>    m_uptrAccount;
-    std::unique_ptr<Server>     m_uptrServer;
+    QBuffer*                    m_ptrBuffer = nullptr;
+    std::shared_ptr<Account>    m_sptrAccount;
+    std::shared_ptr<Server>     m_sptrServer;
 
     Feature::Type m_flgActiveFeatures{};
     std::unordered_map<Feature::Type, std::shared_ptr<Feature>> m_umapEpheralFeatures;
@@ -253,14 +265,19 @@ private:
         SASLSupported::SCRAM_SHA_1,
         SASLSupported::PLAIN
     };
-    std::shared_ptr<SASL::SCRAMGenerator> m_SCRAMGenerator;
+    std::shared_ptr<SASL::SASLGenerator> m_SASLGenerator;
 
     QByteArray m_streamID;
-    std::unordered_map<QByteArray, IQPurpose> m_umapIQWaiting;
-    std::unordered_map<QByteArray, InfoQuery> m_umapIQResults;
+
+    std::unordered_map<jidfull_t, std::unordered_map<QByteArray, InfoQuery>> m_umapIQResults;
 
     ContactTreeModel*                         m_ptrContactsModel;
     std::unordered_map<jidbare_t, ChatChain*> m_umapChatChains;
+
+    Disco m_disco;
+    PubSub m_pubsub;
+
+    QTextStream txtStream;
 
 public slots:
     /**
@@ -275,11 +292,6 @@ public slots:
      * @brief Sends a request to receive a users roster
      */
     void queryRoster();
-
-    /**
-     * @brief Sends a request to service discovery
-     */
-    void queryDisco();
 
     /**
      * @brief Advertises clients presence to the server
@@ -300,7 +312,7 @@ private slots:
      * @brief Called whenever the socket switches its state
      * @param sockState State into which it has been switched.
      */
-    void sslSockStateChange(QAbstractSocket::SocketState sockState);
+    //void sslSockStateChange(QAbstractSocket::SocketState sockState);
 
     /**
      * @brief Reads every incoming data from server
@@ -336,6 +348,20 @@ private slots:
      *
      */
     void finishDisconnect();
+
+    /**
+     * @brief Implements a feature for a specific jid of user
+     * @param jid Jid of the user capable of a implementing feature
+     * @param feature Feature to be implemented
+     */
+    void implementDiscoFeature(const jidfull_t& jid, Disco::Feature feature);
+
+    /**
+     * @brief Informs the ContactModel about user new id
+     * @param jid Jid of the user which avatar was updated
+     * @param id Id of the avatar in DataHolder
+     */
+    void updateAvatar(const jidfull_t& jid, const QString& id);
 
 signals:
 

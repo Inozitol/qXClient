@@ -10,17 +10,22 @@ ChatWidget::ChatWidget(const Contact& contact, QWidget *parent) :
     initLabels(contact);
 }
 
-ChatWidget::~ChatWidget()
-{
+ChatWidget::~ChatWidget(){
     delete(ui);
 }
 
-void ChatWidget::updateMetadata(const Contact &contact){
+void ChatWidget::updateMetadata(const Contact& contact){
     rosteritem_t roster = contact.getRoster();
     if(!roster.name.isEmpty()){
         ui->nameLabel->setText(roster.name);
     }else{
         ui->nameLabel->setText(roster.jid.local);
+    }
+    if(!contact.getAvatarId().isEmpty()){
+        QString id = contact.getAvatarId();
+        QImage avatar = DataHolder::instance().getAvatar(id);
+        ui->avatarLabel->setPixmap(QPixmap::fromImage(avatar));
+        ui->avatarLabel->setScaledContents(true);
     }
 }
 

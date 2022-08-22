@@ -33,6 +33,7 @@ public:
     void setRoster(const rosteritem_t& roster);
     void insertPresence(const Presence& presence);
     void removePresence(const Presence& presence);
+    void updateAvatarId(const jidfull_t& jid, const QString& id);
 
     void setExpanded(const QModelIndex& index, bool value);
 
@@ -43,7 +44,6 @@ private:
     ContactItem* _o2mSpacer;
     jidfull_t _selfJid;
     std::unordered_map<jidbare_t, ContactItem*> m_umapContacts;
-    static const QHash<QString, QIcon> m_iconReference;
 signals:
     void newMessage(const Message& msg);
 };

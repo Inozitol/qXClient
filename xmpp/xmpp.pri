@@ -10,6 +10,7 @@ SOURCES += \
 		$$PWD/contacttreemodel.cpp \
 		$$PWD/creds.cpp \
 		$$PWD/disco.cpp \
+		$$PWD/pubsub.cpp \
 		$$PWD/server.cpp
 
 HEADERS += \
@@ -20,6 +21,7 @@ HEADERS += \
 		$$PWD/contacttreemodel.h \
 		$$PWD/creds.h \
 		$$PWD/disco.h \
+		$$PWD/pubsub.h \
 		$$PWD/roster.h \
 		$$PWD/server.h \
 		$$PWD/treeitem.h
